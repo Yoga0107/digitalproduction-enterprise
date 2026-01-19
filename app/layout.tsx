@@ -6,23 +6,24 @@ import { Inter } from 'next/font/google';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Enterprise Portal - Role Based Access',
-  description: 'Webapp dengan SSO dan role-based sidebar',
+  title: 'Enterprise Portal - Digital Production',
+  description: 'Digital Production Digitazation Enterprise Portal',
   openGraph: {
     images: [
       {
-        url: 'https://bolt.new/static/og_default.png',
+        url: `${process.env.NEXT_PUBLIC_BASE_URL}/logo-master.png`,
       },
     ],
   },
   twitter: {
-    card: 'summary_large_image',
+    card: "summary_large_image",
     images: [
       {
-        url: 'https://bolt.new/static/og_default.png',
+        url: `${process.env.NEXT_PUBLIC_BASE_URL}/logo-master.png`,
       },
     ],
   },
+
 };
 
 export default function RootLayout({
