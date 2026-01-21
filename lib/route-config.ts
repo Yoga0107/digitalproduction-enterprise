@@ -91,6 +91,13 @@ export const menuItems: MenuItem[] = [
     roles: ['admin', 'manager', 'user'],
     description: 'Application settings',
   },
+    {
+    title: 'Forecast Accuracy',
+    href: '/forecast-accuracy/plant_performance_detail',
+    icon: Settings,
+    roles: ['admin', 'manager', 'user'],
+    description: 'Application settings',
+  }
 ];
 
 export function getMenuItemsForRole(role: UserRole): MenuItem[] {
