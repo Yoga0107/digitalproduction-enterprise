@@ -1,108 +1,91 @@
+// lib/auth-context.ts (FIXED)
+
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-
-export type UserRole = 'admin' | 'manager' | 'user' | 'viewer';
+import { createContext, useContext, useEffect, useState } from 'react';
+import { roleIdToRole, UserRole } from './role-map';
 
 export interface User {
-  id: string;
+  id: number;
   email: string;
-  name: string;
+  full_name: string; // WAJIB
   role: UserRole;
-  avatar?: string;
+  role_id?: number;
 }
 
 interface AuthContextType {
+  isLoading: any;
   user: User | null;
-  login: (email: string, password: string) => Promise<boolean>;
+  token: string | null;
+  login: (token: string, user: any) => void;
   logout: () => void;
-  isLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const MOCK_USERS: Record<string, { password: string; user: User }> = {
-  'admin@company.com': {
-    password: 'admin123',
-    user: {
-      id: '1',
-      email: 'admin@company.com',
-      name: 'Admin User',
-      role: 'admin',
-    },
-  },
-  'manager@company.com': {
-    password: 'manager123',
-    user: {
-      id: '2',
-      email: 'manager@company.com',
-      name: 'Manager User',
-      role: 'manager',
-    },
-  },
-  'user@company.com': {
-    password: 'user123',
-    user: {
-      id: '3',
-      email: 'user@company.com',
-      name: 'Regular User',
-      role: 'user',
-    },
-  },
-  'viewer@company.com': {
-    password: 'viewer123',
-    user: {
-      id: '4',
-      email: 'viewer@company.com',
-      name: 'Viewer User',
-      role: 'viewer',
-    },
-  },
-};
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const router = useRouter();
+  const [token, setToken] = useState<string | null>(null);
 
-  useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-    setIsLoading(false);
-  }, []);
+  const login = (accessToken: string, apiUser: any) => {
+    const role = roleIdToRole(apiUser.role_id);
 
-  const login = async (email: string, password: string): Promise<boolean> => {
-    const mockUser = MOCK_USERS[email];
+    const mappedUser: User = {
+      id: apiUser.id,
+      email: apiUser.email,
+      full_name:
+        apiUser.full_name ||
+        apiUser.name ||
+        apiUser.username ||
+        apiUser.email?.split('@')[0] ||
+        'User',
+      role,
+      role_id: apiUser.role_id,
+    };
 
-    if (mockUser && mockUser.password === password) {
-      setUser(mockUser.user);
-      localStorage.setItem('user', JSON.stringify(mockUser.user));
-      return true;
-    }
+    setUser(mappedUser);
+    setToken(accessToken);
 
-    return false;
+    localStorage.setItem('token', accessToken);
+    localStorage.setItem('user', JSON.stringify(mappedUser));
   };
 
   const logout = () => {
     setUser(null);
+    setToken(null);
+    localStorage.removeItem('token');
     localStorage.removeItem('user');
-    router.push('/login');
   };
 
+  useEffect(() => {
+    const savedUser = localStorage.getItem('user');
+    const savedToken = localStorage.getItem('token');
+
+    if (savedUser && savedToken) {
+      const parsed = JSON.parse(savedUser);
+
+      // 🔐 HARD GUARD
+      if (!parsed.full_name) {
+        logout();
+        return;
+      }
+
+      setUser(parsed);
+      setToken(savedToken);
+    }
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, isLoading }}>
+    <AuthContext.Provider value={{ isLoading:false, user, token, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
 }
 
 export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used inside AuthProvider');
+  return ctx;
 }
+export type { UserRole };
+

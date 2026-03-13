@@ -1,4 +1,4 @@
-import { UserRole } from './auth-context';
+import { UserRole } from './role-map';
 import {
   LayoutDashboard,
   Users,
@@ -26,70 +26,66 @@ export const menuItems: MenuItem[] = [
     href: '/dashboard',
     icon: LayoutDashboard,
     roles: ['admin', 'manager', 'user', 'viewer'],
-    description: 'Overview and statistics',
   },
   {
     title: 'Users',
     href: '/users',
     icon: Users,
-    roles: ['admin', 'manager'],
-    description: 'Manage users',
+    roles: ['admin', 'manager', 'viewer'],
   },
   {
     title: 'Reports',
     href: '/reports',
     icon: FileText,
-    roles: ['admin', 'manager', 'user'],
-    description: 'View and generate reports',
+    roles: ['viewer'],
   },
   {
     title: 'Analytics',
     href: '/analytics',
     icon: BarChart3,
-    roles: ['admin', 'manager'],
-    description: 'Data analytics and insights',
+    roles: ['viewer'],
   },
   {
     title: 'Projects',
     href: '/projects',
     icon: FolderOpen,
-    roles: ['admin', 'manager', 'user'],
-    description: 'Manage projects',
+    roles: ['user'],
+  },
+  {
+    title: 'OEE',
+    href: '/oee',
+    icon: Calendar,
+    roles: ['user', 'viewer'],
   },
   {
     title: 'Calendar',
     href: '/calendar',
     icon: Calendar,
-    roles: ['admin', 'manager', 'user', 'viewer'],
-    description: 'Schedule and events',
+    roles: ['user', 'viewer'],
   },
   {
     title: 'Notifications',
     href: '/notifications',
     icon: Bell,
-    roles: ['admin', 'manager', 'user', 'viewer'],
-    description: 'System notifications',
+    roles: ['user', 'viewer'],
   },
   {
     title: 'Database',
     href: '/database',
     icon: Database,
     roles: ['admin'],
-    description: 'Database management',
   },
   {
     title: 'Security',
     href: '/security',
     icon: Shield,
     roles: ['admin'],
-    description: 'Security settings',
   },
   {
     title: 'Settings',
     href: '/settings',
     icon: Settings,
     roles: ['admin', 'manager', 'user'],
-    description: 'Application settings',
   },
 ];
 
