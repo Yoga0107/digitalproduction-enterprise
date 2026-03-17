@@ -1,51 +1,91 @@
-import {
-  Line,
-  Shift,
-  KodePakan,
-  MachineLossLevel1,
-  MachineLossLevel2,
-  MachineLossLevel3
-} from "../types/master"
+/**
+ * services/masterService.ts
+ * Semua master data API calls — unified machine_losses endpoint.
+ */
 
-export const getLines = async (): Promise<Line[]> => {
-  return [
-    { id: "1", name: "CKP Line 1" },
-    { id: "2", name: "CKP Line 2" }
-  ]
-}
+import { api } from '@/lib/api-client';
+import type {
+  ApiShift, ApiFeedCode, ApiLine, ApiStandardThroughput, ApiMachineLoss,
+} from '@/types/api';
 
-export const getShifts = async (): Promise<Shift[]> => {
-  return [
-    { id: "1", name: "Shift 1", startTime: "07:00", endTime: "15:00" },
-    { id: "2", name: "Shift 2", startTime: "15:00", endTime: "23:00" },
-    { id: "3", name: "Shift 3", startTime: "23:00", endTime: "07:00" }
-  ]
-}
+// ─── Machine Losses (unified) ──────────────────────────────────────────────
+export const getMachineLosses = () =>
+  api.get<ApiMachineLoss[]>('/api/v1/master/machine-losses');
 
-export const getKodePakan = async (): Promise<KodePakan[]> => {
-  return [
-    { id: "1", kode: "5111", description: "Starter Feed" },
-    { id: "2", kode: "5122", description: "Grower Feed" }
-  ]
-}
+export const createMachineLoss = (data: {
+  parent_id?: number | null;
+  level: number;
+  name: string;
+  description?: string;
+  sort_order?: number;
+}) => api.post<ApiMachineLoss>('/api/v1/master/machine-losses', data);
 
-export const getMachineLossLevel1 = async (): Promise<MachineLossLevel1[]> => {
-  return [
-    { id: "1", name: "Breakdown" },
-    { id: "2", name: "Minor Stop" }
-  ]
-}
+export const updateMachineLoss = (id: number, data: Partial<{
+  name: string;
+  description: string;
+  is_active: boolean;
+  sort_order: number;
+}>) => api.put<ApiMachineLoss>(`/api/v1/master/machine-losses/${id}`, data);
 
-export const getMachineLossLevel2 = async (): Promise<MachineLossLevel2[]> => {
-  return [
-    { id: "1", level1Id: "1", name: "Motor" },
-    { id: "2", level1Id: "1", name: "Gearbox" }
-  ]
-}
+export const moveMachineLoss = (id: number, data: {
+  new_parent_id: number | null;
+  new_level: number;
+  new_sort_order: number;
+}) => api.patch<ApiMachineLoss>(`/api/v1/master/machine-losses/${id}/move`, data);
 
-export const getMachineLossLevel3 = async (): Promise<MachineLossLevel3[]> => {
-  return [
-    { id: "1", level2Id: "1", name: "Bearing" },
-    { id: "2", level2Id: "1", name: "Overheat" }
-  ]
-}
+export const deleteMachineLoss = (id: number) =>
+  api.delete(`/api/v1/master/machine-losses/${id}`);
+
+// ─── Shifts ────────────────────────────────────────────────────────────────
+export const getShifts = () => api.get<ApiShift[]>('/api/v1/master/shifts');
+
+export const createShift = (data: { name: string; time_from: string; time_to: string; remarks?: string }) =>
+  api.post<ApiShift>('/api/v1/master/shifts', data);
+
+export const updateShift = (id: number, data: Partial<{
+  name: string; time_from: string; time_to: string; remarks: string; is_active: boolean;
+}>) => api.put<ApiShift>(`/api/v1/master/shifts/${id}`, data);
+
+export const deleteShift = (id: number) =>
+  api.delete(`/api/v1/master/shifts/${id}`);
+
+// ─── Feed Codes ────────────────────────────────────────────────────────────
+export const getFeedCodes = () => api.get<ApiFeedCode[]>('/api/v1/master/feed-codes');
+
+export const createFeedCode = (data: { code: string; remarks?: string }) =>
+  api.post<ApiFeedCode>('/api/v1/master/feed-codes', data);
+
+export const updateFeedCode = (id: number, data: Partial<{
+  code: string; remarks: string; is_active: boolean;
+}>) => api.put<ApiFeedCode>(`/api/v1/master/feed-codes/${id}`, data);
+
+export const deleteFeedCode = (id: number) =>
+  api.delete(`/api/v1/master/feed-codes/${id}`);
+
+// ─── Lines ─────────────────────────────────────────────────────────────────
+export const getLines = () => api.get<ApiLine[]>('/api/v1/master/lines');
+
+export const createLine = (data: { name: string; code?: string; remarks?: string }) =>
+  api.post<ApiLine>('/api/v1/master/lines', data);
+
+export const updateLine = (id: number, data: Partial<{
+  name: string; code: string; remarks: string; is_active: boolean;
+}>) => api.put<ApiLine>(`/api/v1/master/lines/${id}`, data);
+
+export const deleteLine = (id: number) =>
+  api.delete(`/api/v1/master/lines/${id}`);
+
+// ─── Standard Throughputs ──────────────────────────────────────────────────
+export const getStandardThroughputs = () =>
+  api.get<ApiStandardThroughput[]>('/api/v1/master/standard-throughputs');
+
+export const createStandardThroughput = (data: {
+  line_id: number; feed_code_id: number; standard_throughput: number; remarks?: string;
+}) => api.post<ApiStandardThroughput>('/api/v1/master/standard-throughputs', data);
+
+export const updateStandardThroughput = (id: number, data: Partial<{
+  standard_throughput: number; remarks: string;
+}>) => api.put<ApiStandardThroughput>(`/api/v1/master/standard-throughputs/${id}`, data);
+
+export const deleteStandardThroughput = (id: number) =>
+  api.delete(`/api/v1/master/standard-throughputs/${id}`);

@@ -3,53 +3,61 @@
 import { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth, UserRole } from '@/lib/auth-context';
+import { Factory } from 'lucide-react';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
   allowedRoles?: UserRole[];
-  authPage?: boolean; 
-  // true  => halaman login / register
-  // false => halaman protected (default)
+  authPage?: boolean;
+  requirePlant?: boolean; // apakah halaman ini butuh active plant
 }
 
 export function ProtectedRoute({
   children,
   allowedRoles,
   authPage = false,
+  requirePlant = false,
 }: ProtectedRouteProps) {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, activePlant, accessiblePlants } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
     if (isLoading) return;
 
-    // ===============================
-    // 1️⃣ AUTH PAGE (LOGIN / REGISTER)
-    // ===============================
+    // ── Auth pages (login / register) ──────────────────────────────────────
     if (authPage) {
       if (user) {
-        router.replace('/dashboard');
+        // Jika sudah login, arahkan ke select-plant atau dashboard
+        if (!activePlant && accessiblePlants.length > 1) {
+          router.replace('/select-plant');
+        } else {
+          router.replace('/dashboard');
+        }
       }
       return;
     }
 
-    // ===============================
-    // 2️⃣ PROTECTED PAGE
-    // ===============================
+    // ── Protected pages ────────────────────────────────────────────────────
     if (!user) {
       router.replace('/login');
       return;
     }
 
+    // ── Role guard ─────────────────────────────────────────────────────────
     if (allowedRoles && !allowedRoles.includes(user.role)) {
       router.replace('/unauthorized');
+      return;
     }
-  }, [user, isLoading, allowedRoles, authPage, router, pathname]);
 
-  // ===============================
-  // ⏳ LOADING STATE
-  // ===============================
+    // ── Plant guard ────────────────────────────────────────────────────────
+    if (requirePlant && !activePlant) {
+      router.replace('/select-plant');
+      return;
+    }
+  }, [user, isLoading, activePlant, accessiblePlants, allowedRoles, authPage, requirePlant, router, pathname]);
+
+  // ── Loading ────────────────────────────────────────────────────────────────
   if (isLoading) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -61,6 +69,7 @@ export function ProtectedRoute({
   if (authPage && user) return null;
   if (!authPage && !user) return null;
   if (allowedRoles && user && !allowedRoles.includes(user.role)) return null;
+  if (requirePlant && !activePlant) return null;
 
   return <>{children}</>;
 }
