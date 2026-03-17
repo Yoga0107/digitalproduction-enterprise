@@ -8,27 +8,32 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { MachineLossTree, LossNode, MovePayload } from "@/components/oee/machine-loss-tree"
 import {
-  getMachineLosses, createMachineLoss, updateMachineLoss,
-  deleteMachineLoss, moveMachineLoss,
+  getMachineLosses,
+  createLossLevel1, updateLossLevel1, deleteLossLevel1,
+  createLossLevel2, updateLossLevel2, deleteLossLevel2,
+  createLossLevel3, updateLossLevel3, deleteLossLevel3,
+  moveMachineLoss,
 } from "@/services/masterService"
 import { ApiMachineLoss } from "@/types/api"
 import { toast } from "sonner"
 import { Loader2, Plus, RefreshCw, Check, X } from "lucide-react"
 
-// ─── Flat list → tree ────────────────────────────────────────────────────────
 function buildTree(flat: ApiMachineLoss[]): LossNode[] {
   const map = new Map<number, LossNode>()
-  flat.forEach(n => map.set(n.id, { id: n.id, parent_id: n.parent_id, level: n.level, name: n.name, sort_order: n.sort_order, children: [] }))
+  flat.forEach(n => map.set(n.id, {
+    id: n.id, parent_id: n.parent_id,
+    level: n.level, name: n.name,
+    sort_order: n.sort_order, children: [],
+  }))
   const roots: LossNode[] = []
   map.forEach(node => {
-    if (node.parent_id === null) {
-      roots.push(node)
-    } else {
+    if (node.parent_id === null) roots.push(node)
+    else {
       const parent = map.get(node.parent_id)
       if (parent) parent.children.push(node)
+      else roots.push(node)
     }
   })
-  // Sort by sort_order then id
   const sort = (ns: LossNode[]) => {
     ns.sort((a, b) => a.sort_order - b.sort_order || a.id - b.id)
     ns.forEach(n => sort(n.children))
@@ -55,104 +60,137 @@ export default function MachineLossPage() {
       const data = await getMachineLosses()
       setFlat(data)
       setTree(buildTree(data))
-    } catch { toast.error("Gagal memuat data machine losses") }
-    finally { setIsLoading(false) }
+    } catch {
+      toast.error("Failed to load machine losses")
+    } finally {
+      setIsLoading(false)
+    }
   }, [])
 
   useEffect(() => { load() }, [load])
 
-  // ── Add Level 1 ─────────────────────────────────────────────────────────
+  function findFlat(id: number) {
+    return flat.find(n => n.id === id)
+  }
+
   async function saveL1() {
     if (!newL1.trim()) return
     setSavingL1(true)
     try {
-      const created = await createMachineLoss({ parent_id: null, level: 1, name: newL1.trim(), sort_order: flat.filter(n => n.level === 1).length })
-      const newNode: ApiMachineLoss = created
-      setFlat(prev => [...prev, newNode])
-      setTree(prev => [...prev, { id: created.id, parent_id: null, level: 1, name: created.name, sort_order: created.sort_order, children: [] }])
+      await createLossLevel1({ name: newL1.trim(), sort_order: flat.filter(n => n.level === 1).length })
+      await load()
       setNewL1(""); setAddingL1(false)
-      toast.success("Level 1 berhasil ditambahkan")
-    } catch { toast.error("Gagal menambah Level 1") }
-    finally { setSavingL1(false) }
+      toast.success("Level 1 added successfully")
+    } catch {
+      toast.error("Failed to add Level 1")
+    } finally {
+      setSavingL1(false)
+    }
   }
 
-  // ── Add child ────────────────────────────────────────────────────────────
   async function handleAddChild(parentId: number, level: 2 | 3, name: string) {
     try {
       const sortOrder = flat.filter(n => n.parent_id === parentId).length
-      await createMachineLoss({ parent_id: parentId, level, name, sort_order: sortOrder })
+      if (level === 2) {
+        await createLossLevel2({ level_1_id: parentId, name, sort_order: sortOrder })
+      } else {
+        await createLossLevel3({ level_2_id: parentId, name, sort_order: sortOrder })
+      }
       await load()
-      toast.success(`Level ${level} berhasil ditambahkan`)
-    } catch { toast.error("Gagal menambah child") }
-  }
-
-  // ── Update name ──────────────────────────────────────────────────────────
-  async function handleUpdate(id: number, name: string) {
-    try {
-      await updateMachineLoss(id, { name })
-      setFlat(prev => prev.map(n => n.id === id ? { ...n, name } : n))
-      setTree(buildTree(flat.map(n => n.id === id ? { ...n, name } : n)))
-      toast.success("Nama berhasil diperbarui")
-    } catch { toast.error("Gagal memperbarui nama") }
-  }
-
-  // ── Delete ───────────────────────────────────────────────────────────────
-  async function handleDelete(id: number, hasChildren: boolean) {
-    if (hasChildren) { toast.error("Hapus child terlebih dahulu sebelum menghapus parent"); return }
-    try {
-      await deleteMachineLoss(id)
-      const newFlat = flat.filter(n => n.id !== id)
-      setFlat(newFlat)
-      setTree(buildTree(newFlat))
-      toast.success("Data berhasil dihapus")
-    } catch { toast.error("Gagal menghapus data") }
-  }
-
-  // ── Move (drag & drop) ───────────────────────────────────────────────────
-  async function handleMove(payload: MovePayload) {
-    try {
-      const updated = await moveMachineLoss(payload.id, {
-        new_parent_id: payload.new_parent_id,
-        new_level: payload.new_level,
-        new_sort_order: payload.new_sort_order,
-      })
-      const newFlat = flat.map(n => n.id === payload.id
-        ? { ...n, parent_id: updated.parent_id, level: updated.level, sort_order: updated.sort_order }
-        : n
-      )
-      setFlat(newFlat)
-      setTree(buildTree(newFlat))
-      toast.success("Node berhasil dipindah")
+      toast.success(`Level ${level} added successfully`)
     } catch (err: any) {
-      toast.error(err?.detail ?? "Gagal memindah node")
-      await load() // reload jika ada error untuk sinkron
+      toast.error(err?.detail ?? `Failed to add Level ${level}`)
+    }
+  }
+
+  async function handleUpdate(id: number, name: string) {
+    const node = findFlat(id)
+    if (!node) return
+    try {
+      if (node.level === 1)      await updateLossLevel1(id, { name })
+      else if (node.level === 2) await updateLossLevel2(id, { name })
+      else                       await updateLossLevel3(id, { name })
+      await load()
+      toast.success("Name updated successfully")
+    } catch {
+      toast.error("Failed to update name")
+    }
+  }
+
+  async function handleDelete(id: number, hasChildren: boolean) {
+    if (hasChildren) { toast.error("Remove child items first"); return }
+    const node = findFlat(id)
+    if (!node) return
+    try {
+      if (node.level === 1)      await deleteLossLevel1(id)
+      else if (node.level === 2) await deleteLossLevel2(id)
+      else                       await deleteLossLevel3(id)
+      await load()
+      toast.success("Item deleted")
+    } catch (err: any) {
+      toast.error(err?.detail ?? "Failed to delete item")
+    }
+  }
+
+  async function handleMove(payload: MovePayload) {
+    const node = findFlat(payload.id)
+    if (!node) return
+    try {
+      if (node.level === payload.new_level) {
+        // Reorder within the same level
+        if (node.level === 1)      await updateLossLevel1(payload.id, { sort_order: payload.new_sort_order })
+        else if (node.level === 2) await updateLossLevel2(payload.id, { sort_order: payload.new_sort_order })
+        else                       await updateLossLevel3(payload.id, { sort_order: payload.new_sort_order })
+        await load()
+        toast.success("Order updated")
+      } else {
+        // Cross-level move (promote / demote)
+        await moveMachineLoss(payload.id, {
+          new_parent_id:  payload.new_parent_id,
+          new_level:      payload.new_level,
+          new_sort_order: payload.new_sort_order,
+        })
+        await load()
+        toast.success(
+          payload.new_level < node.level
+            ? `Promoted to Level ${payload.new_level}`
+            : `Demoted to Level ${payload.new_level}`
+        )
+      }
+    } catch (err: any) {
+      toast.error(err?.detail ?? "Failed to move node")
+      await load()
     }
   }
 
   return (
     <OeeGuard section="master">
       <div className="p-8 space-y-6">
+
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Master Machine Losses</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Saved to <code className="text-xs bg-muted px-1 py-0.5 rounded">loss_level_1/2/3</code> and
+              auto-synced to <code className="text-xs bg-muted px-1 py-0.5 rounded">machine_losses</code> via trigger.
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={load} disabled={isLoading}>
               <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
               Refresh
             </Button>
-            <Button onClick={() => setAddingL1(true)} disabled={addingL1}>
-              <Plus className="h-4 w-4 mr-2" /> Tambah Level 1
+            <Button size="sm" onClick={() => setAddingL1(true)} disabled={addingL1}>
+              <Plus className="h-4 w-4 mr-2" /> Add Level 1
             </Button>
           </div>
         </div>
 
-        {/* Legend */}
         <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
           {[
-            { label: "L1", style: "bg-blue-100 text-blue-700 border-blue-200", desc: "Loss Category" },
-            { label: "L2", style: "bg-violet-100 text-violet-700 border-violet-200", desc: "Sub Category" },
-            { label: "L3", style: "bg-emerald-100 text-emerald-700 border-emerald-200", desc: "Detail Loss" },
+            { label: "L1", style: "bg-blue-100 text-blue-700 border-blue-200",          desc: "Loss Category"  },
+            { label: "L2", style: "bg-violet-100 text-violet-700 border-violet-200",    desc: "Sub Category"   },
+            { label: "L3", style: "bg-emerald-100 text-emerald-700 border-emerald-200", desc: "Detail Loss"    },
           ].map(({ label, style, desc }) => (
             <span key={label} className="flex items-center gap-1">
               <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${style}`}>{label}</span>
@@ -164,19 +202,25 @@ export default function MachineLossPage() {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
-              Struktur Machine Losses
-              {!isLoading && <Badge variant="secondary">{countAll(tree)} item</Badge>}
+              Machine Loss Structure
+              {!isLoading && <Badge variant="secondary">{countAll(tree)} items</Badge>}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {/* Add Level 1 inline */}
             {addingL1 && (
               <div className="flex items-center gap-2 mb-3 p-2.5 rounded-md bg-blue-50 border border-blue-200">
                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border bg-blue-100 text-blue-700 border-blue-200 shrink-0">L1</span>
-                <Input autoFocus placeholder="Nama Loss Category baru..."
-                  value={newL1} onChange={e => setNewL1(e.target.value)}
-                  onKeyDown={e => { if (e.key === "Enter") saveL1(); if (e.key === "Escape") { setAddingL1(false); setNewL1("") } }}
-                  className="h-8 text-sm flex-1" />
+                <Input
+                  autoFocus
+                  placeholder="New Loss Category name..."
+                  value={newL1}
+                  onChange={e => setNewL1(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === "Enter") saveL1()
+                    if (e.key === "Escape") { setAddingL1(false); setNewL1("") }
+                  }}
+                  className="h-8 text-sm flex-1"
+                />
                 <Button size="sm" onClick={saveL1} disabled={savingL1 || !newL1.trim()}>
                   {savingL1 ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
                 </Button>
@@ -187,7 +231,9 @@ export default function MachineLossPage() {
             )}
 
             {isLoading ? (
-              <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+              <div className="flex justify-center py-16">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
             ) : (
               <MachineLossTree
                 nodes={tree}
@@ -199,6 +245,7 @@ export default function MachineLossPage() {
             )}
           </CardContent>
         </Card>
+
       </div>
     </OeeGuard>
   )

@@ -1,30 +1,23 @@
-// ─── Auth ──────────────────────────────────────────────────────────────────
 export interface ApiRole { id: number; name: string }
 
 export interface ApiUser {
   id: number; username: string; email: string;
-  full_name: string | null; role: ApiRole;
-  is_active: boolean; is_superuser: boolean; created_at: string;
+  full_name: string; role: ApiRole; is_active: boolean;
+  is_superuser: boolean; created_at: string;
 }
 
 export interface ApiPlant {
   id: number; name: string; code: string;
-  schema_name: string; is_active: boolean;
-  description?: string | null; created_at?: string;
+  schema_name: string; description: string | null;
+  is_active: boolean; created_at: string;
 }
 
-export interface ApiToken {
-  access_token: string; refresh_token: string;
-  token_type: string; expires_in: number;
-}
-
-export interface LoginResponse {
-  token: ApiToken; user: ApiUser; accessible_plants: ApiPlant[];
-}
-
+export interface ApiToken { access_token: string; token_type: string }
+export interface LoginResponse { access_token: string; token_type: string; user: ApiUser }
 export interface RegisterResponse { message: string; user: ApiUser }
 
-// ─── Machine Loss (unified) ────────────────────────────────────────────────
+// ─── Machine Losses (tabel self-referencing, sumber kebenaran untuk master page) ─
+// Tabel ini disync dari loss_level_1/2/3 via trigger/manual
 export interface ApiMachineLoss {
   id: number;
   parent_id: number | null;
@@ -37,6 +30,25 @@ export interface ApiMachineLoss {
   created_by_id: number | null;
 }
 
+// ─── Loss Level Master Tables (tabel input terpisah per level) ────────────
+export interface ApiLossLevel1 {
+  id: number; name: string; description: string | null;
+  sort_order: number; is_active: boolean;
+  created_at: string; created_by_id: number | null;
+}
+
+export interface ApiLossLevel2 {
+  id: number; level_1_id: number; name: string; description: string | null;
+  sort_order: number; is_active: boolean;
+  created_at: string; created_by_id: number | null;
+}
+
+export interface ApiLossLevel3 {
+  id: number; level_2_id: number; name: string; description: string | null;
+  sort_order: number; is_active: boolean;
+  created_at: string; created_by_id: number | null;
+}
+
 // ─── Master Data ──────────────────────────────────────────────────────────
 export interface ApiShift {
   id: number; name: string;
@@ -46,8 +58,9 @@ export interface ApiShift {
 }
 
 export interface ApiFeedCode {
-  id: number; code: string; remarks: string | null;
-  is_active: boolean; created_at: string; created_by_id: number | null;
+  id: number; code: string;
+  remarks: string | null; is_active: boolean;
+  created_at: string; created_by_id: number | null;
 }
 
 export interface ApiLine {
