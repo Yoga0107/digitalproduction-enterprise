@@ -26,14 +26,29 @@ const [open,setOpen] = useState(false)
 return(
 
 
-<div className="p-8 space-y-6">
+
+<div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50/30">
+        <div className="relative overflow-hidden bg-gradient-to-r from-teal-700 to-emerald-600 px-8 py-10">
+          <div className="absolute -top-8 -right-8 h-40 w-40 rounded-full bg-white/5" />
+          <div className="relative flex items-center gap-4">
+            <div className="h-14 w-14 rounded-2xl bg-white/15 backdrop-blur flex items-center justify-center">
+              <Factory className="h-7 w-7 text-white" />
+            </div>
+            <div>
+              <p className="text-white/60 text-xs font-semibold uppercase tracking-widest mb-1">Input Data</p>
+              <h2 className="text-3xl font-bold text-white tracking-tight">Input Machine Loss</h2>
+              <p className="text-white/70 text-sm mt-1">Pencatatan kerugian mesin harian</p>
+            </div>
+          </div>
+        </div>
+        <div className="p-8 space-y-6">
 
 {/* HEADER */}
 
 <div className="flex justify-between items-center">
-<h1 className="text-3xl font-bold">Machine Losses</h1>
+<h1 className="text-3xl font-bold text-emerald-900">Machine Losses</h1>
 
-<Button onClick={()=>setOpen(true)}>
+<Button className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-sm gap-2" onClick={()=>setOpen(true)}>
 <Plus className="h-4 w-4 mr-2"/>
 Add New
 </Button>
@@ -85,7 +100,7 @@ Search
 <CardHeader>
 <CardTitle>Total Loss</CardTitle>
 </CardHeader>
-<CardContent className="text-2xl font-bold">
+<CardContent className="text-2xl font-bold text-emerald-900">
 4.5 hr
 </CardContent>
 </Card>
@@ -94,7 +109,7 @@ Search
 <CardHeader>
 <CardTitle>Breakdown</CardTitle>
 </CardHeader>
-<CardContent className="text-2xl font-bold">
+<CardContent className="text-2xl font-bold text-emerald-900">
 2.1 hr
 </CardContent>
 </Card>
@@ -103,7 +118,7 @@ Search
 <CardHeader>
 <CardTitle>Setup</CardTitle>
 </CardHeader>
-<CardContent className="text-2xl font-bold">
+<CardContent className="text-2xl font-bold text-emerald-900">
 1.3 hr
 </CardContent>
 </Card>
@@ -112,7 +127,7 @@ Search
 <CardHeader>
 <CardTitle>Cleaning</CardTitle>
 </CardHeader>
-<CardContent className="text-2xl font-bold">
+<CardContent className="text-2xl font-bold text-emerald-900">
 1.1 hr
 </CardContent>
 </Card>
@@ -180,6 +195,7 @@ Search
 <MachineLossModal open={open} setOpen={setOpen}/>
 
 </div>
+      </div>
 
 
 )

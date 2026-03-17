@@ -3,6 +3,10 @@
 import { OeeGuard } from '@/components/oee/oee-guard'
 import { useState, useMemo } from "react"
 
+import { Clock } from "lucide-react"
+import { Timer } from "lucide-react"
+import { TrendingUp } from "lucide-react"
+import { LineChart } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
@@ -227,25 +231,39 @@ export default function AvailabilityRatePage() {
 
 
   
+
 <OeeGuard section="view">
- className="space-y-6">
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50/30">
+        {/* HERO */}
+        <div className="relative overflow-hidden bg-gradient-to-r from-cyan-700 via-teal-600 to-emerald-600 px-8 py-10">
+          <div className="absolute -top-8 -right-8 h-40 w-40 rounded-full bg-white/5" />
+          <div className="relative flex items-center gap-4">
+            <div className="h-14 w-14 rounded-2xl bg-white/15 backdrop-blur flex items-center justify-center">
+              <BarChart2 className="h-7 w-7 text-white" />
+            </div>
+            <div>
+              <p className="text-white/60 text-xs font-semibold uppercase tracking-widest mb-1">OEE Data View</p>
+              <h1 className="text-3xl font-bold text-white tracking-tight">Availability Rate</h1>
+              <p className="text-white/70 text-sm mt-1">Persentase ketersediaan mesin</p>
+            </div>
+          </div>
+        </div>
+        <div className="p-8 space-y-6">
 
-      <h1 className="text-2xl font-bold">
-        Availability Rate
-      </h1>
+      
 
 
-      <Card>
-
-        <CardHeader>
-          <CardTitle>Filter</CardTitle>
+      <Card className="border-0 shadow-sm overflow-hidden">
+          <div className="h-1 w-full bg-gradient-to-r from-emerald-400 to-teal-400" />
+        <CardHeader className="bg-emerald-50/60">
+          <CardTitle className="text-emerald-900 flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-emerald-500 inline-block"/>Filter</CardTitle>
         </CardHeader>
 
         <CardContent className="flex flex-wrap gap-4">
 
           <div>
 
-            <p className="text-sm mb-1">
+            <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-1">
               From Date
             </p>
 
@@ -260,7 +278,7 @@ export default function AvailabilityRatePage() {
 
           <div>
 
-            <p className="text-sm mb-1">
+            <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-1">
               To Date
             </p>
 
@@ -275,7 +293,7 @@ export default function AvailabilityRatePage() {
 
           <div>
 
-            <p className="text-sm mb-1">
+            <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-1">
               Monthly
             </p>
 
@@ -327,7 +345,7 @@ export default function AvailabilityRatePage() {
 
             <div>
 
-              <p className="text-sm mb-1">
+              <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-1">
                 Start Date
               </p>
 
@@ -342,7 +360,7 @@ export default function AvailabilityRatePage() {
 
             <div>
 
-              <p className="text-sm mb-1">
+              <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-1">
                 End Date
               </p>
 

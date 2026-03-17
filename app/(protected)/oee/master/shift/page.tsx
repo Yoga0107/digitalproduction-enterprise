@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { getShifts, createShift, updateShift, deleteShift } from '@/services/masterService'
 import { toast } from 'sonner'
-import { Loader2, Plus, Pencil, Trash2, AlertCircle, Clock } from 'lucide-react'
+import { Loader2, Plus, Pencil, Trash2, AlertCircle, Clock, Timer } from 'lucide-react'
 import { ApiError } from '@/lib/api-client'
 
 // ─── Shift 1–10 preset names (hardcode) ──────────────────────────────────
@@ -123,14 +123,29 @@ export default function MasterShiftPage() {
   const allRegistered = availableNames.length === 0
 
   return (
-    <OeeGuard section="master">
-      <div className="p-8 space-y-6">
+    
+<OeeGuard section="master">
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50/30">
+        <div className="relative overflow-hidden bg-gradient-to-r from-emerald-700 to-teal-600 px-8 py-10">
+          <div className="absolute -top-8 -right-8 h-40 w-40 rounded-full bg-white/5" />
+          <div className="relative flex items-center gap-4">
+            <div className="h-14 w-14 rounded-2xl bg-white/15 backdrop-blur flex items-center justify-center">
+              <Timer className="h-7 w-7 text-white" />
+            </div>
+            <div>
+              <p className="text-white/60 text-xs font-semibold uppercase tracking-widest mb-1">Master Data</p>
+              <h2 className="text-3xl font-bold text-white tracking-tight">Master Shift</h2>
+              <p className="text-white/70 text-sm mt-1">Konfigurasi shift kerja mesin</p>
+            </div>
+          </div>
+        </div>
+        <div className="p-8 space-y-6">
 
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Master Shift</h1>
-            <p className="text-muted-foreground text-sm mt-1">
+            <h1 className="text-3xl font-bold tracking-tight text-emerald-900">Master Shift</h1>
+            <p className="text-emerald-600 text-sm mt-1">
               Shift Management
             </p>
           </div>
@@ -141,7 +156,7 @@ export default function MasterShiftPage() {
         </div>
 
         {/* Progress indicator */}
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <div className="flex items-center gap-2 text-sm text-emerald-600">
           <Clock className="h-4 w-4" />
           <span>{rows.length} shift terdaftar</span>
           <div className="flex gap-1 ml-2">
@@ -154,14 +169,14 @@ export default function MasterShiftPage() {
             <CardTitle className="text-base flex items-center gap-2">
               Daftar Shift
               {!isLoading && (
-                <Badge variant="secondary">{rows.length} / {SHIFT_NAMES.length}</Badge>
+                <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">{rows.length} / {SHIFT_NAMES.length}</Badge>
               )}
             </CardTitle>
           </CardHeader>
           <CardContent>
             {isLoading ? (
               <div className="flex justify-center py-16">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
               </div>
             ) : (
               <Table>
@@ -177,7 +192,7 @@ export default function MasterShiftPage() {
                 <TableBody>
                   {rows.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">
+                      <TableCell colSpan={5} className="text-center py-12 text-emerald-600">
                         Belum ada shift. Klik "Tambah Shift" untuk menambahkan.
                       </TableCell>
                     </TableRow>
@@ -194,12 +209,12 @@ export default function MasterShiftPage() {
                           <span className="font-semibold">{r.name}</span>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className="font-mono">{r.from}</Badge>
+                          <Badge variant="outline" className="border-emerald-200 text-emerald-700 font-mono">{r.from}</Badge>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className="font-mono">{r.to}</Badge>
+                          <Badge variant="outline" className="border-emerald-200 text-emerald-700 font-mono">{r.to}</Badge>
                         </TableCell>
-                        <TableCell className="text-muted-foreground text-sm">
+                        <TableCell className="text-emerald-600 text-sm">
                           {r.remarks || '-'}
                         </TableCell>
                         <TableCell>
@@ -257,7 +272,7 @@ export default function MasterShiftPage() {
                               <div className="flex items-center gap-2">
                                 <span>{name}</span>
                                 {takenByOther && (
-                                  <Badge variant="secondary" className="text-xs">Sudah ada</Badge>
+                                  <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 text-xs">Sudah ada</Badge>
                                 )}
                               </div>
                             </SelectItem>
@@ -273,7 +288,7 @@ export default function MasterShiftPage() {
                   </SelectContent>
                 </Select>
                 {editing && (
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-emerald-600">
                     Nama shift tidak dapat diubah setelah disimpan.
                   </p>
                 )}
@@ -339,6 +354,7 @@ export default function MasterShiftPage() {
           confirmText="Hapus"
           isLoading={isDeleting}
         />
+          </div>
       </div>
     </OeeGuard>
   )

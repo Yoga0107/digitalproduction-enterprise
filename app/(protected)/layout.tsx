@@ -9,7 +9,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
     <ProtectedRoute requirePlant>
       <div className="flex h-screen overflow-hidden">
         <Sidebar />
-        <main className="flex-1 overflow-y-auto bg-muted/30">
+        <main className="flex-1 overflow-y-auto bg-emerald-50/20">
           {children}
         </main>
       </div>

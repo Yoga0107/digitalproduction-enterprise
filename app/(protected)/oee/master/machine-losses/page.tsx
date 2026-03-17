@@ -16,7 +16,7 @@ import {
 } from "@/services/masterService"
 import { ApiMachineLoss } from "@/types/api"
 import { toast } from "sonner"
-import { Loader2, Plus, RefreshCw, Check, X } from "lucide-react"
+import { Loader2, Plus, RefreshCw, Check, X, Workflow } from "lucide-react"
 
 function buildTree(flat: ApiMachineLoss[]): LossNode[] {
   const map = new Map<number, LossNode>()
@@ -164,13 +164,28 @@ export default function MachineLossPage() {
   }
 
   return (
-    <OeeGuard section="master">
-      <div className="p-8 space-y-6">
+    
+<OeeGuard section="master">
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50/30">
+        <div className="relative overflow-hidden bg-gradient-to-r from-teal-800 to-cyan-600 px-8 py-10">
+          <div className="absolute -top-8 -right-8 h-40 w-40 rounded-full bg-white/5" />
+          <div className="relative flex items-center gap-4">
+            <div className="h-14 w-14 rounded-2xl bg-white/15 backdrop-blur flex items-center justify-center">
+              <Workflow className="h-7 w-7 text-white" />
+            </div>
+            <div>
+              <p className="text-white/60 text-xs font-semibold uppercase tracking-widest mb-1">Master Data</p>
+              <h2 className="text-3xl font-bold text-white tracking-tight">Machine Losses</h2>
+              <p className="text-white/70 text-sm mt-1">Kategori kerugian mesin</p>
+            </div>
+          </div>
+        </div>
+        <div className="p-8 space-y-6">
 
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Master Machine Losses</h1>
-            <p className="text-sm text-muted-foreground mt-1">
+            <h1 className="text-3xl font-bold tracking-tight text-emerald-900">Master Machine Losses</h1>
+            <p className="text-sm text-emerald-600 mt-1">
               Saved to <code className="text-xs bg-muted px-1 py-0.5 rounded">loss_level_1/2/3</code> and
               auto-synced to <code className="text-xs bg-muted px-1 py-0.5 rounded">machine_losses</code> via trigger.
             </p>
@@ -186,9 +201,9 @@ export default function MachineLossPage() {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-3 text-xs text-emerald-600">
           {[
-            { label: "L1", style: "bg-blue-100 text-blue-700 border-blue-200",          desc: "Loss Category"  },
+            { label: "L1", style: "bg-emerald-100 text-emerald-700 border-emerald-200",          desc: "Loss Category"  },
             { label: "L2", style: "bg-violet-100 text-violet-700 border-violet-200",    desc: "Sub Category"   },
             { label: "L3", style: "bg-emerald-100 text-emerald-700 border-emerald-200", desc: "Detail Loss"    },
           ].map(({ label, style, desc }) => (
@@ -203,13 +218,13 @@ export default function MachineLossPage() {
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               Machine Loss Structure
-              {!isLoading && <Badge variant="secondary">{countAll(tree)} items</Badge>}
+              {!isLoading && <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">{countAll(tree)} items</Badge>}
             </CardTitle>
           </CardHeader>
           <CardContent>
             {addingL1 && (
-              <div className="flex items-center gap-2 mb-3 p-2.5 rounded-md bg-blue-50 border border-blue-200">
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border bg-blue-100 text-blue-700 border-blue-200 shrink-0">L1</span>
+              <div className="flex items-center gap-2 mb-3 p-2.5 rounded-md bg-emerald-50 border border-emerald-200">
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border bg-emerald-100 text-emerald-700 border-emerald-200 shrink-0">L1</span>
                 <Input
                   autoFocus
                   placeholder="New Loss Category name..."
@@ -232,7 +247,7 @@ export default function MachineLossPage() {
 
             {isLoading ? (
               <div className="flex justify-center py-16">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
               </div>
             ) : (
               <MachineLossTree
@@ -246,6 +261,7 @@ export default function MachineLossPage() {
           </CardContent>
         </Card>
 
+          </div>
       </div>
     </OeeGuard>
   )

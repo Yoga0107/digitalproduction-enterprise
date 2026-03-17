@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { getLines, createLine, updateLine, deleteLine } from '@/services/masterService'
 import { toast } from 'sonner'
-import { Loader2, Plus, Pencil, Trash2, AlertCircle } from 'lucide-react'
+import { Loader2, Plus, Pencil, Trash2, AlertCircle, Factory } from 'lucide-react'
 import { ApiError } from '@/lib/api-client'
 
 type LineRow = { id: number; name: string; code: string; remarks: string }
@@ -77,12 +77,27 @@ export default function MasterLinePage() {
   }
 
   return (
-    <OeeGuard section="master">
-      <div className="p-8 space-y-6">
+    
+<OeeGuard section="master">
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50/30">
+        <div className="relative overflow-hidden bg-gradient-to-r from-teal-700 to-cyan-600 px-8 py-10">
+          <div className="absolute -top-8 -right-8 h-40 w-40 rounded-full bg-white/5" />
+          <div className="relative flex items-center gap-4">
+            <div className="h-14 w-14 rounded-2xl bg-white/15 backdrop-blur flex items-center justify-center">
+              <Factory className="h-7 w-7 text-white" />
+            </div>
+            <div>
+              <p className="text-white/60 text-xs font-semibold uppercase tracking-widest mb-1">Master Data</p>
+              <h2 className="text-3xl font-bold text-white tracking-tight">Master Line</h2>
+              <p className="text-white/70 text-sm mt-1">Konfigurasi lini produksi</p>
+            </div>
+          </div>
+        </div>
+        <div className="p-8 space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Master Line</h1>
-            <p className="text-muted-foreground text-sm mt-1">Kelola data line produksi</p>
+            <h1 className="text-3xl font-bold tracking-tight text-emerald-900">Master Line</h1>
+            <p className="text-emerald-600 text-sm mt-1">Kelola data line produksi</p>
           </div>
           <Button onClick={openAdd}><Plus className="h-4 w-4 mr-2" /> Tambah Line</Button>
         </div>
@@ -90,12 +105,12 @@ export default function MasterLinePage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
-              Daftar Line {!isLoading && <Badge variant="secondary">{rows.length} data</Badge>}
+              Daftar Line {!isLoading && <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">{rows.length} data</Badge>}
             </CardTitle>
           </CardHeader>
           <CardContent>
             {isLoading ? (
-              <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+              <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-emerald-600" /></div>
             ) : (
               <Table>
                 <TableHeader>
@@ -108,12 +123,12 @@ export default function MasterLinePage() {
                 </TableHeader>
                 <TableBody>
                   {rows.length === 0 ? (
-                    <TableRow><TableCell colSpan={4} className="text-center py-12 text-muted-foreground">Belum ada data line</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={4} className="text-center py-12 text-emerald-600">Belum ada data line</TableCell></TableRow>
                   ) : rows.map(r => (
                     <TableRow key={r.id}>
                       <TableCell className="font-medium">{r.name}</TableCell>
-                      <TableCell>{r.code ? <Badge variant="outline">{r.code}</Badge> : <span className="text-muted-foreground">-</span>}</TableCell>
-                      <TableCell className="text-muted-foreground text-sm">{r.remarks || '-'}</TableCell>
+                      <TableCell>{r.code ? <Badge variant="outline" className="border-emerald-200 text-emerald-700">{r.code}</Badge> : <span className="text-emerald-600">-</span>}</TableCell>
+                      <TableCell className="text-emerald-600 text-sm">{r.remarks || '-'}</TableCell>
                       <TableCell>
                         <div className="flex justify-center gap-1">
                           <Button size="sm" variant="ghost" onClick={() => openEdit(r)}><Pencil className="h-3.5 w-3.5" /></Button>
@@ -159,6 +174,7 @@ export default function MasterLinePage() {
         <ConfirmDialog open={!!deleteId} onClose={() => setDeleteId(null)} onConfirm={handleDelete}
           title="Hapus Line" description="Line akan dinonaktifkan. Data throughput terkait mungkin terpengaruh. Lanjutkan?"
           confirmText="Hapus" isLoading={isDeleting} />
+          </div>
       </div>
     </OeeGuard>
   )

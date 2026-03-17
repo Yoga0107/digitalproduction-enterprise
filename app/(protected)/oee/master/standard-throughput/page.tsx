@@ -17,7 +17,7 @@ import {
   createStandardThroughput, updateStandardThroughput, deleteStandardThroughput,
 } from "@/services/masterService"
 import { toast } from "sonner"
-import { Loader2, Plus, Pencil, Trash2, AlertCircle } from "lucide-react"
+import { Loader2, Plus, Pencil, Trash2, AlertCircle, Activity } from "lucide-react"
 import { ApiError } from "@/lib/api-client"
 
 type Row = { id: number; lineId: number; lineName: string; feedCodeId: number; feedCode: string; throughput: number; remarks: string }
@@ -101,12 +101,27 @@ export default function StandardThroughputPage() {
   }
 
   return (
-    <OeeGuard section="master">
-      <div className="p-8 space-y-6">
+    
+<OeeGuard section="master">
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50/30">
+        <div className="relative overflow-hidden bg-gradient-to-r from-emerald-800 to-emerald-600 px-8 py-10">
+          <div className="absolute -top-8 -right-8 h-40 w-40 rounded-full bg-white/5" />
+          <div className="relative flex items-center gap-4">
+            <div className="h-14 w-14 rounded-2xl bg-white/15 backdrop-blur flex items-center justify-center">
+              <Activity className="h-7 w-7 text-white" />
+            </div>
+            <div>
+              <p className="text-white/60 text-xs font-semibold uppercase tracking-widest mb-1">Master Data</p>
+              <h2 className="text-3xl font-bold text-white tracking-tight">Standard Throughput</h2>
+              <p className="text-white/70 text-sm mt-1">Standar throughput per line</p>
+            </div>
+          </div>
+        </div>
+        <div className="p-8 space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Standard Throughput</h1>
-            <p className="text-muted-foreground text-sm mt-1">Throughput standar per kombinasi Line dan Kode Pakan</p>
+            <h1 className="text-3xl font-bold tracking-tight text-emerald-900">Standard Throughput</h1>
+            <p className="text-emerald-600 text-sm mt-1">Throughput standar per kombinasi Line dan Kode Pakan</p>
           </div>
           <Button onClick={openAdd} disabled={lines.length === 0 || feeds.length === 0}>
             <Plus className="h-4 w-4 mr-2" /> Tambah
@@ -123,12 +138,12 @@ export default function StandardThroughputPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
-              Daftar Standard Throughput {!isLoading && <Badge variant="secondary">{rows.length} data</Badge>}
+              Daftar Standard Throughput {!isLoading && <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">{rows.length} data</Badge>}
             </CardTitle>
           </CardHeader>
           <CardContent>
             {isLoading ? (
-              <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+              <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-emerald-600" /></div>
             ) : (
               <Table>
                 <TableHeader>
@@ -142,13 +157,13 @@ export default function StandardThroughputPage() {
                 </TableHeader>
                 <TableBody>
                   {rows.length === 0 ? (
-                    <TableRow><TableCell colSpan={5} className="text-center py-12 text-muted-foreground">Belum ada data</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={5} className="text-center py-12 text-emerald-600">Belum ada data</TableCell></TableRow>
                   ) : rows.map(r => (
                     <TableRow key={r.id}>
                       <TableCell className="font-medium">{r.lineName}</TableCell>
-                      <TableCell><Badge variant="outline" className="font-mono">{r.feedCode}</Badge></TableCell>
+                      <TableCell><Badge variant="outline" className="border-emerald-200 text-emerald-700 font-mono">{r.feedCode}</Badge></TableCell>
                       <TableCell className="text-right font-mono font-semibold">{r.throughput.toLocaleString("id-ID")}</TableCell>
-                      <TableCell className="text-muted-foreground text-sm">{r.remarks || "-"}</TableCell>
+                      <TableCell className="text-emerald-600 text-sm">{r.remarks || "-"}</TableCell>
                       <TableCell>
                         <div className="flex justify-center gap-1">
                           <Button size="sm" variant="ghost" onClick={() => openEdit(r)}><Pencil className="h-3.5 w-3.5" /></Button>
@@ -173,7 +188,7 @@ export default function StandardThroughputPage() {
                   <SelectTrigger><SelectValue placeholder="Pilih Line..." /></SelectTrigger>
                   <SelectContent>{lines.map(l => <SelectItem key={l.id} value={String(l.id)}>{l.label}</SelectItem>)}</SelectContent>
                 </Select>
-                {editing && <p className="text-xs text-muted-foreground">Line tidak dapat diubah setelah disimpan.</p>}
+                {editing && <p className="text-xs text-emerald-600">Line tidak dapat diubah setelah disimpan.</p>}
               </div>
               <div className="space-y-1.5">
                 <Label>Kode Pakan <span className="text-destructive">*</span></Label>
@@ -205,6 +220,7 @@ export default function StandardThroughputPage() {
         <ConfirmDialog open={!!deleteId} onClose={() => setDeleteId(null)} onConfirm={handleDelete}
           title="Hapus Standard Throughput" description="Data ini akan dihapus permanen. Lanjutkan?"
           confirmText="Hapus" isLoading={isDeleting} />
+          </div>
       </div>
     </OeeGuard>
   )
