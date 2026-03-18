@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
+import { ProtectedRoute } from '@/components/protected-route';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,25 +13,14 @@ import { ApiError } from '@/lib/api-client';
 import Image from 'next/image';
 import Link from 'next/link';
 
-export default function LoginPage() {
+function LoginForm() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const { login, user, activePlant } = useAuth();
-  const router = useRouter();
-
-  // Kalau sudah login → arahkan berdasarkan status plant
-  useEffect(() => {
-    if (!user) return;
-    if (activePlant) {
-      router.replace('/dashboard');
-    } else {
-      router.replace('/select-plant');
-    }
-  }, [user, activePlant, router]);
+  const { login } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,7 +28,7 @@ export default function LoginPage() {
     setIsLoading(true);
     try {
       await login(username.trim(), password);
-      // Redirect ditangani oleh useEffect di atas setelah state user ter-set
+      // Redirect ditangani oleh ProtectedRoute (authPage) setelah state user ter-set
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.status === 401 ? 'Username atau password salah.' : (err.detail || 'Terjadi kesalahan.'));
@@ -127,5 +116,13 @@ export default function LoginPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <ProtectedRoute authPage>
+      <LoginForm />
+    </ProtectedRoute>
   );
 }

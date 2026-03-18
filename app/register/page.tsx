@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { registerApi } from '@/services/authService';
+import { ProtectedRoute } from '@/components/protected-route';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,7 +14,7 @@ import { ApiError } from '@/lib/api-client';
 import Image from 'next/image';
 import Link from 'next/link';
 
-export default function RegisterPage() {
+function RegisterForm() {
   const router = useRouter();
 
   const [form, setForm] = useState({
@@ -193,5 +194,13 @@ export default function RegisterPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <ProtectedRoute authPage>
+      <RegisterForm />
+    </ProtectedRoute>
   );
 }

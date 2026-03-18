@@ -3,20 +3,21 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth, Plant } from '@/lib/auth-context';
+import { usePlantSwitch } from '@/hooks/use-plant-switch';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Factory, ChevronRight, LogOut, CheckCircle2 } from 'lucide-react';
+import { Factory, ChevronRight, LogOut, CheckCircle2, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 import { ROLE_LABELS } from '@/lib/role-map';
 
 export default function SelectPlantPage() {
   const { user, accessiblePlants, activePlant, selectPlant, logout, isLoading } = useAuth();
+  const { switchPlant, isSwitching } = usePlantSwitch();
   const router = useRouter();
 
   useEffect(() => {
     if (isLoading) return;
-    // Belum login → ke login
     if (!user) { router.replace('/login'); return; }
     // Kalau cuma 1 plant → langsung pilih dan masuk
     if (accessiblePlants.length === 1 && !activePlant) {
@@ -26,8 +27,13 @@ export default function SelectPlantPage() {
   }, [user, isLoading, accessiblePlants, activePlant, selectPlant, router]);
 
   const handleSelectPlant = (plant: Plant) => {
-    selectPlant(plant);
-    router.push('/dashboard');
+    // Kalau plant berbeda dari yang aktif → switch + hard refresh ke dashboard
+    // Kalau sama → langsung ke dashboard
+    if (plant.id !== activePlant?.id) {
+      switchPlant(plant, '/dashboard');
+    } else {
+      router.push('/dashboard');
+    }
   };
 
   const handleLogout = async () => {
@@ -82,11 +88,13 @@ export default function SelectPlantPage() {
             </p>
             {accessiblePlants.map((plant) => {
               const isActive = activePlant?.id === plant.id;
+              const isThisSwitching = isSwitching && !isActive;
               return (
                 <button
                   key={plant.id}
                   onClick={() => handleSelectPlant(plant)}
-                  className="w-full text-left"
+                  disabled={isSwitching}
+                  className="w-full text-left disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   <Card className={`cursor-pointer transition-all hover:shadow-md hover:border-blue-400 ${
                     isActive ? 'border-blue-500 bg-blue-50/60 shadow-sm' : 'hover:bg-slate-50'
@@ -96,7 +104,9 @@ export default function SelectPlantPage() {
                         <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${
                           isActive ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-600'
                         }`}>
-                          <Factory className="h-5 w-5" />
+                          {isThisSwitching
+                            ? <Loader2 className="h-5 w-5 animate-spin" />
+                            : <Factory className="h-5 w-5" />}
                         </div>
                         <div>
                           <p className="font-semibold text-sm">{plant.name}</p>
@@ -120,7 +130,7 @@ export default function SelectPlantPage() {
           </div>
         )}
 
-        <Button variant="ghost" className="w-full text-muted-foreground" onClick={handleLogout}>
+        <Button variant="ghost" className="w-full text-muted-foreground" onClick={handleLogout} disabled={isSwitching}>
           <LogOut className="mr-2 h-4 w-4" />
           Logout
         </Button>

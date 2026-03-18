@@ -66,6 +66,8 @@ export interface ApiFeedCode {
 export interface ApiLine {
   id: number; plant_id: number; name: string;
   code: string | null; remarks: string | null;
+  current_feed_code_id: number | null;
+  current_feed_code_code: string | null;
   is_active: boolean; created_at: string; created_by_id: number | null;
 }
 
@@ -73,4 +75,25 @@ export interface ApiStandardThroughput {
   id: number; line_id: number; feed_code_id: number;
   standard_throughput: number; remarks: string | null;
   created_at: string; created_by_id: number | null;
+}
+
+export interface ApiProductionOutput {
+  id: number
+  date: string
+  line_id: number
+  shift_id: number
+  feed_code_id: number | null
+  production_plan: number | null
+  actual_output: number
+  good_product: number
+  reject_product: number
+  quality_rate: number
+  remarks: string | null
+  is_active: boolean
+  created_at: string
+  created_by_id: number | null
+  // embedded names
+  line_name: string | null
+  shift_name: string | null
+  feed_code_code: string | null
 }

@@ -3,6 +3,7 @@ import {
   ApiMachineLoss,
   ApiLossLevel1, ApiLossLevel2, ApiLossLevel3,
   ApiShift, ApiFeedCode, ApiLine, ApiStandardThroughput,
+  ApiProductionOutput,
 } from '@/types/api';
 
 // ─── Machine Losses (self-referencing, digunakan oleh master page tree) ────
@@ -84,8 +85,10 @@ export const deleteFeedCode = (id: number) => api.delete(`/api/v1/master/feed-co
 export const getLines = () => api.get<ApiLine[]>('/api/v1/master/lines');
 export const createLine = (data: { name: string; code?: string; remarks?: string }) =>
   api.post<ApiLine>('/api/v1/master/lines', data);
-export const updateLine = (id: number, data: Partial<{ name: string; code: string; remarks: string; is_active: boolean }>) =>
+export const updateLine = (id: number, data: Partial<{ name: string; code: string; remarks: string; current_feed_code_id: number | null; is_active: boolean }>) =>
   api.put<ApiLine>(`/api/v1/master/lines/${id}`, data);
+export const setLineFeedCode = (id: number, current_feed_code_id: number | null) =>
+  api.patch<ApiLine>(`/api/v1/master/lines/${id}/feed-code`, { current_feed_code_id });
 export const deleteLine = (id: number) => api.delete(`/api/v1/master/lines/${id}`);
 
 // ─── Standard Throughputs ──────────────────────────────────────────────────
