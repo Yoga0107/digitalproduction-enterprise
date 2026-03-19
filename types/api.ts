@@ -4,6 +4,7 @@ export interface ApiUser {
   id: number; username: string; email: string;
   full_name: string; role: ApiRole; is_active: boolean;
   is_superuser: boolean; created_at: string;
+  plant_ids: number[];
 }
 
 export interface ApiPlant {
@@ -96,4 +97,29 @@ export interface ApiProductionOutput {
   line_name: string | null
   shift_name: string | null
   feed_code_code: string | null
+}
+
+export interface ApiMachineLossInput {
+  id: number
+  date: string
+  line_id: number
+  shift_id: number
+  feed_code_id: number | null
+  loss_l1_id: number | null
+  loss_l2_id: number | null
+  loss_l3_id: number | null
+  time_from: string | null
+  time_to: string | null
+  duration_minutes: number
+  remarks: string | null
+  is_active: boolean
+  created_at: string
+  created_by_id: number | null
+  // denormalised
+  line_name: string | null
+  shift_name: string | null
+  feed_code_code: string | null
+  loss_l1_name: string | null
+  loss_l2_name: string | null
+  loss_l3_name: string | null
 }

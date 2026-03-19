@@ -7,7 +7,7 @@
 
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { roleIdToRole, UserRole } from './role-map';
-import { loginApi, logoutApi } from '@/services/authService';
+import { loginApi, logoutApi, googleSsoApi } from '@/services/authService';
 import type { ApiPlant } from '@/types/api';
 
 export interface User {
@@ -18,6 +18,8 @@ export interface User {
   role: UserRole;
   role_id: number;
   is_superuser: boolean;
+  is_active: boolean;
+  created_at: string;
 }
 
 export interface Plant {
@@ -35,6 +37,7 @@ interface AuthContextType {
   accessiblePlants: Plant[];
   isLoading: boolean;
   login: (username: string, password: string) => Promise<void>;
+  loginWithGoogle: (credential: string) => Promise<void>;
   logout: () => Promise<void>;
   selectPlant: (plant: Plant) => void;
 }
@@ -69,6 +72,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setAccessiblePlants([]);
   }, []);
 
+  const _applyLoginData = (data: any) => {
+    const mappedUser: User = {
+      id: data.user.id,
+      username: data.user.username,
+      email: data.user.email,
+      full_name: data.user.full_name || data.user.username,
+      role: roleIdToRole(data.user.role?.id),
+      role_id: data.user.role?.id ?? 0,
+      is_superuser: data.user.is_superuser,
+      is_active: data.user.is_active ?? true,
+      created_at: data.user.created_at ?? new Date().toISOString(),
+    };
+    const plants = data.accessible_plants.map(mapApiPlant);
+    setUser(mappedUser);
+    setToken(data.token.access_token);
+    setAccessiblePlants(plants);
+    if (plants.length > 0) setActivePlant(plants[0]);
+    localStorage.setItem('token', data.token.access_token);
+    localStorage.setItem('user', JSON.stringify(mappedUser));
+    localStorage.setItem('accessiblePlants', JSON.stringify(plants));
+    if (plants.length > 0) localStorage.setItem('activePlant', JSON.stringify(plants[0]));
+  };
+
+  const loginWithGoogle = useCallback(async (credential: string) => {
+    const data = await googleSsoApi(credential);
+    _applyLoginData(data);
+  }, []);
+
   const login = useCallback(async (username: string, password: string) => {
     const data = await loginApi(username, password);
 
@@ -80,6 +111,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       role: roleIdToRole(data.user.role?.id),
       role_id: data.user.role?.id ?? 0,
       is_superuser: data.user.is_superuser,
+      is_active: data.user.is_active ?? true,
+      created_at: data.user.created_at ?? new Date().toISOString(),
     };
 
     const plants = data.accessible_plants.map(mapApiPlant);
@@ -145,7 +178,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [clearSession]);
 
   return (
-    <AuthContext.Provider value={{ user, token, activePlant, accessiblePlants, isLoading, login, logout, selectPlant }}>
+    <AuthContext.Provider value={{ user, token, activePlant, accessiblePlants, isLoading, login, loginWithGoogle, logout, selectPlant }}>
       {children}
     </AuthContext.Provider>
   );

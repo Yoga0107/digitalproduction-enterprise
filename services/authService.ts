@@ -67,3 +67,13 @@ export async function changePasswordApi(payload: {
     { withPlant: false }
   );
 }
+
+// ─── Google SSO ──────────────────────────────────────────────────────────────
+
+export async function googleSsoApi(credential: string): Promise<LoginResponse> {
+  return api.post<LoginResponse>(
+    '/api/v1/auth/google',
+    { credential },
+    { withPlant: false }
+  )
+}

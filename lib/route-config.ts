@@ -49,6 +49,7 @@ export const menuItems: MenuItem[] = [
       { title: 'Kode Pakan',             href: '/oee/master/kode-pakan',           roles: OEE_MASTER_ROLES, group: 'Master Data' },
       { title: 'Standard Throughput',    href: '/oee/master/standard-throughput',  roles: OEE_MASTER_ROLES, group: 'Master Data' },
       { title: 'Machine Losses',         href: '/oee/master/machine-losses',       roles: OEE_MASTER_ROLES, group: 'Master Data' },
+      { title: 'Line Groups',            href: '/oee/master/line-groups',          roles: OEE_MASTER_ROLES, group: 'Master Data' },
 
       // Input Data — admin, manager, operator
       { title: 'Input Output',           href: '/oee/input/output',                roles: OEE_INPUT_ROLES,  group: 'Input Data' },
