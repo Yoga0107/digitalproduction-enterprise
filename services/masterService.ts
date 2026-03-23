@@ -4,6 +4,7 @@ import {
   ApiLossLevel1, ApiLossLevel2, ApiLossLevel3,
   ApiShift, ApiFeedCode, ApiLine, ApiStandardThroughput,
   ApiProductionOutput,
+  ApiMergedLine,
 } from '@/types/api';
 
 // ─── Machine Losses (self-referencing, digunakan oleh master page tree) ────
@@ -85,10 +86,8 @@ export const deleteFeedCode = (id: number) => api.delete(`/api/v1/master/feed-co
 export const getLines = () => api.get<ApiLine[]>('/api/v1/master/lines');
 export const createLine = (data: { name: string; code?: string; remarks?: string }) =>
   api.post<ApiLine>('/api/v1/master/lines', data);
-export const updateLine = (id: number, data: Partial<{ name: string; code: string; remarks: string; current_feed_code_id: number | null; is_active: boolean }>) =>
+export const updateLine = (id: number, data: Partial<{ name: string; code: string; remarks: string; is_active: boolean }>) =>
   api.put<ApiLine>(`/api/v1/master/lines/${id}`, data);
-export const setLineFeedCode = (id: number, current_feed_code_id: number | null) =>
-  api.patch<ApiLine>(`/api/v1/master/lines/${id}/feed-code`, { current_feed_code_id });
 export const deleteLine = (id: number) => api.delete(`/api/v1/master/lines/${id}`);
 
 // ─── Standard Throughputs ──────────────────────────────────────────────────
@@ -100,3 +99,19 @@ export const updateStandardThroughput = (id: number, data: Partial<{ standard_th
   api.put<ApiStandardThroughput>(`/api/v1/master/standard-throughputs/${id}`, data);
 export const deleteStandardThroughput = (id: number) =>
   api.delete(`/api/v1/master/standard-throughputs/${id}`);
+
+// ─── Merged Lines ──────────────────────────────────────────────────────────
+export const getMergedLines = () =>
+  api.get<ApiMergedLine[]>('/api/v1/master/merged-lines');
+
+export const getMergedLine = (id: number) =>
+  api.get<ApiMergedLine>(`/api/v1/master/merged-lines/${id}`);
+
+export const createMergedLine = (data: { name: string; code?: string; remarks?: string; line_ids: number[] }) =>
+  api.post<ApiMergedLine>('/api/v1/master/merged-lines', data);
+
+export const updateMergedLine = (id: number, data: Partial<{ name: string; code: string; remarks: string; line_ids: number[]; is_active: boolean }>) =>
+  api.put<ApiMergedLine>(`/api/v1/master/merged-lines/${id}`, data);
+
+export const deleteMergedLine = (id: number) =>
+  api.delete(`/api/v1/master/merged-lines/${id}`);

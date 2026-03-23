@@ -9,77 +9,94 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Checkbox } from '@/components/ui/checkbox'
 import { ConfirmDialog } from '@/components/confirm-dialog'
-import { getLines, createLine, updateLine, deleteLine, getFeedCodes, setLineFeedCode } from '@/services/masterService'
-import { ApiLine, ApiFeedCode } from '@/types/api'
+import {
+  getLines, createLine, updateLine, deleteLine,
+  getMergedLines, createMergedLine, updateMergedLine, deleteMergedLine,
+} from '@/services/masterService'
+import { ApiLine, ApiMergedLine } from '@/types/api'
 import { toast } from 'sonner'
-import { Loader2, Plus, Pencil, Trash2, AlertCircle, Factory, Tag, ArrowLeftRight } from 'lucide-react'
+import {
+  Loader2, Plus, Pencil, Trash2, AlertCircle,
+  Factory, GitMerge, Layers,
+} from 'lucide-react'
 import { ApiError } from '@/lib/api-client'
 
+// ─── Types ───────────────────────────────────────────────────────────────────
 type LineRow = {
   id: number
   name: string
   code: string
   remarks: string
-  current_feed_code_id: number | null
-  current_feed_code_code: string | null
 }
 
-const EMPTY_FORM = { name: '', code: '', remarks: '' }
+type MergedRow = {
+  id: number
+  name: string
+  code: string
+  remarks: string
+  members: { line_id: number; line_name: string; line_code: string | null }[]
+}
 
+const EMPTY_LINE_FORM   = { name: '', code: '', remarks: '' }
+const EMPTY_MERGED_FORM = { name: '', code: '', remarks: '' }
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 export default function MasterLinePage() {
-  const [rows, setRows]               = useState<LineRow[]>([])
-  const [feedCodes, setFeedCodes]     = useState<ApiFeedCode[]>([])
-  const [isLoading, setIsLoading]     = useState(true)
-  const [isSaving, setIsSaving]       = useState(false)
 
-  // Dialog tambah / edit line
-  const [dialogOpen, setDialogOpen]   = useState(false)
-  const [editing, setEditing]         = useState<LineRow | null>(null)
-  const [form, setForm]               = useState(EMPTY_FORM)
-  const [formError, setFormError]     = useState('')
-
-  // Dialog ganti kode pakan
-  const [fcDialogOpen, setFcDialogOpen] = useState(false)
-  const [fcTarget, setFcTarget]         = useState<LineRow | null>(null)
-  const [fcSelected, setFcSelected]     = useState<string>('none')
-  const [fcSaving, setFcSaving]         = useState(false)
-
-  // Confirm delete
-  const [deleteId, setDeleteId]   = useState<number | null>(null)
+  // ── Master Line state ──────────────────────────────────────────────────────
+  const [rows, setRows]             = useState<LineRow[]>([])
+  const [isLoading, setIsLoading]   = useState(true)
+  const [isSaving, setIsSaving]     = useState(false)
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [editing, setEditing]       = useState<LineRow | null>(null)
+  const [form, setForm]             = useState(EMPTY_LINE_FORM)
+  const [formError, setFormError]   = useState('')
+  const [deleteId, setDeleteId]     = useState<number | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
 
+  // ── Merged Line state ──────────────────────────────────────────────────────
+  const [mergedRows, setMergedRows]               = useState<MergedRow[]>([])
+  const [mergedLoading, setMergedLoading]         = useState(true)
+  const [mergedDialogOpen, setMergedDialogOpen]   = useState(false)
+  const [editingMerged, setEditingMerged]         = useState<MergedRow | null>(null)
+  const [mergedForm, setMergedForm]               = useState(EMPTY_MERGED_FORM)
+  const [mergedSelectedIds, setMergedSelectedIds] = useState<number[]>([])
+  const [mergedFormError, setMergedFormError]     = useState('')
+  const [mergedSaving, setMergedSaving]           = useState(false)
+  const [deleteMergedId, setDeleteMergedId]       = useState<number | null>(null)
+  const [isDeletingMerged, setIsDeletingMerged]   = useState(false)
+
+  // ── Load ───────────────────────────────────────────────────────────────────
   useEffect(() => { load() }, [])
 
   async function load() {
     try {
-      setIsLoading(true)
-      const [lineData, fcData] = await Promise.all([getLines(), getFeedCodes()])
-      setFeedCodes(fcData.filter(f => f.is_active))
+      setIsLoading(true); setMergedLoading(true)
+      const [lineData, mergedData] = await Promise.all([getLines(), getMergedLines()])
       setRows(lineData.map(toRow))
+      setMergedRows(mergedData.map(toMergedRow))
     } catch {
       toast.error('Gagal memuat data')
     } finally {
-      setIsLoading(false)
+      setIsLoading(false); setMergedLoading(false)
     }
   }
 
   function toRow(l: ApiLine): LineRow {
-    return {
-      id: l.id,
-      name: l.name,
-      code: l.code ?? '',
-      remarks: l.remarks ?? '',
-      current_feed_code_id: l.current_feed_code_id,
-      current_feed_code_code: l.current_feed_code_code,
-    }
+    return { id: l.id, name: l.name, code: l.code ?? '', remarks: l.remarks ?? '' }
   }
 
-  // ── Add / Edit Line ──────────────────────────────────────────────────────────
-  function openAdd() {
-    setEditing(null); setForm(EMPTY_FORM); setFormError(''); setDialogOpen(true)
+  function toMergedRow(m: ApiMergedLine): MergedRow {
+    return { id: m.id, name: m.name, code: m.code ?? '', remarks: m.remarks ?? '', members: m.members }
   }
+
+  // ── Master Line handlers ───────────────────────────────────────────────────
+  function openAdd() {
+    setEditing(null); setForm(EMPTY_LINE_FORM); setFormError(''); setDialogOpen(true)
+  }
+
   function openEdit(r: LineRow) {
     setEditing(r)
     setForm({ name: r.name, code: r.code, remarks: r.remarks })
@@ -92,7 +109,7 @@ export default function MasterLinePage() {
     if (!form.name.trim()) { setFormError('Nama line wajib diisi.'); return }
     setIsSaving(true)
     try {
-      const payload = { name: form.name.trim(), code: form.code.trim() || undefined, remarks: form.remarks }
+      const payload = { name: form.name.trim(), code: form.code.trim() || undefined, remarks: form.remarks || undefined }
       if (editing) {
         const u = await updateLine(editing.id, payload)
         setRows(prev => prev.map(r => r.id === editing.id ? toRow(u) : r))
@@ -109,29 +126,6 @@ export default function MasterLinePage() {
     } finally { setIsSaving(false) }
   }
 
-  // ── Ganti Kode Pakan ────────────────────────────────────────────────────────
-  function openFeedCodeDialog(r: LineRow) {
-    setFcTarget(r)
-    setFcSelected(r.current_feed_code_id ? String(r.current_feed_code_id) : 'none')
-    setFcDialogOpen(true)
-  }
-
-  async function handleSetFeedCode() {
-    if (!fcTarget) return
-    setFcSaving(true)
-    try {
-      const newId = fcSelected === 'none' ? null : Number(fcSelected)
-      const u = await setLineFeedCode(fcTarget.id, newId)
-      setRows(prev => prev.map(r => r.id === fcTarget.id ? toRow(u) : r))
-      toast.success(newId ? 'Kode pakan berhasil diganti' : 'Kode pakan berhasil dihapus dari line')
-      setFcDialogOpen(false)
-    } catch (err) {
-      if (err instanceof ApiError) toast.error(err.detail)
-      else toast.error('Gagal mengatur kode pakan')
-    } finally { setFcSaving(false) }
-  }
-
-  // ── Delete ───────────────────────────────────────────────────────────────────
   async function handleDelete() {
     if (!deleteId) return
     setIsDeleting(true)
@@ -143,217 +137,434 @@ export default function MasterLinePage() {
     finally { setIsDeleting(false); setDeleteId(null) }
   }
 
+  // ── Merged Line handlers ───────────────────────────────────────────────────
+  function openAddMerged() {
+    setEditingMerged(null); setMergedForm(EMPTY_MERGED_FORM)
+    setMergedSelectedIds([]); setMergedFormError(''); setMergedDialogOpen(true)
+  }
+
+  function openEditMerged(r: MergedRow) {
+    setEditingMerged(r)
+    setMergedForm({ name: r.name, code: r.code, remarks: r.remarks })
+    setMergedSelectedIds(r.members.map(m => m.line_id))
+    setMergedFormError('')
+    setMergedDialogOpen(true)
+  }
+
+  function toggleMergedLine(id: number) {
+    setMergedSelectedIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    )
+  }
+
+  async function handleSaveMerged() {
+    setMergedFormError('')
+    if (!mergedForm.name.trim()) { setMergedFormError('Nama merged line wajib diisi.'); return }
+    if (mergedSelectedIds.length < 2) { setMergedFormError('Pilih minimal 2 line untuk digabungkan.'); return }
+    setMergedSaving(true)
+    try {
+      const payload = {
+        name: mergedForm.name.trim(),
+        code: mergedForm.code.trim() || undefined,
+        remarks: mergedForm.remarks || undefined,
+        line_ids: mergedSelectedIds,
+      }
+      if (editingMerged) {
+        const u = await updateMergedLine(editingMerged.id, payload)
+        setMergedRows(prev => prev.map(r => r.id === editingMerged.id ? toMergedRow(u) : r))
+        toast.success('Merged line berhasil diperbarui')
+      } else {
+        const c = await createMergedLine(payload)
+        setMergedRows(prev => [...prev, toMergedRow(c)])
+        toast.success('Merged line berhasil dibuat')
+      }
+      setMergedDialogOpen(false)
+    } catch (err) {
+      if (err instanceof ApiError) setMergedFormError(err.detail)
+      else toast.error('Gagal menyimpan merged line')
+    } finally { setMergedSaving(false) }
+  }
+
+  async function handleDeleteMerged() {
+    if (!deleteMergedId) return
+    setIsDeletingMerged(true)
+    try {
+      await deleteMergedLine(deleteMergedId)
+      setMergedRows(prev => prev.filter(r => r.id !== deleteMergedId))
+      toast.success('Merged line berhasil dihapus')
+    } catch { toast.error('Gagal menghapus merged line') }
+    finally { setIsDeletingMerged(false); setDeleteMergedId(null) }
+  }
+
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
-<OeeGuard section="master">
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50/30">
-      <div className="relative overflow-hidden bg-gradient-to-r from-teal-700 to-cyan-600 px-8 py-10">
-        <div className="absolute -top-8 -right-8 h-40 w-40 rounded-full bg-white/5" />
-        <div className="relative flex items-center gap-4">
-          <div className="h-14 w-14 rounded-2xl bg-white/15 backdrop-blur flex items-center justify-center">
-            <Factory className="h-7 w-7 text-white" />
+    <OeeGuard section="master">
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50/30">
+
+        {/* Header */}
+        <div className="relative overflow-hidden bg-gradient-to-r from-teal-700 to-cyan-600 px-8 py-10">
+          <div className="absolute -top-8 -right-8 h-40 w-40 rounded-full bg-white/5" />
+          <div className="relative flex items-center gap-4">
+            <div className="h-14 w-14 rounded-2xl bg-white/15 backdrop-blur flex items-center justify-center">
+              <Factory className="h-7 w-7 text-white" />
+            </div>
+            <div>
+              <p className="text-white/60 text-xs font-semibold uppercase tracking-widest mb-1">Master Data</p>
+              <h2 className="text-3xl font-bold text-white tracking-tight">Master Line</h2>
+              <p className="text-white/70 text-sm mt-1">Konfigurasi line produksi</p>
+            </div>
           </div>
-          <div>
-            <p className="text-white/60 text-xs font-semibold uppercase tracking-widest mb-1">Master Data</p>
-            <h2 className="text-3xl font-bold text-white tracking-tight">Master Line</h2>
-            <p className="text-white/70 text-sm mt-1">Konfigurasi lini produksi &amp; kode pakan</p>
+        </div>
+
+        <div className="p-8 space-y-10">
+
+          {/* ═══════════════════════ SECTION 1 — MASTER LINE ═══════════════════════ */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-9 w-9 rounded-xl bg-emerald-100 flex items-center justify-center">
+                  <Layers className="h-5 w-5 text-emerald-700" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold tracking-tight text-emerald-900">Master Line</h1>
+                  <p className="text-emerald-600 text-sm">Daftar line produksi yang tersedia di plant ini.</p>
+                </div>
+              </div>
+              <Button onClick={openAdd}>
+                <Plus className="h-4 w-4 mr-2" /> Tambah Line
+              </Button>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  Daftar Line
+                  {!isLoading && (
+                    <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">{rows.length} data</Badge>
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <div className="flex justify-center py-16">
+                    <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nama Line</TableHead>
+                        <TableHead>Kode Line</TableHead>
+                        <TableHead>Remarks</TableHead>
+                        <TableHead className="text-center w-28">Aksi</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {rows.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={4} className="text-center py-12 text-emerald-600">
+                            Belum ada data line
+                          </TableCell>
+                        </TableRow>
+                      ) : rows.map(r => (
+                        <TableRow key={r.id}>
+                          <TableCell className="font-medium">{r.name}</TableCell>
+                          <TableCell>
+                            {r.code
+                              ? <Badge variant="outline" className="border-emerald-200 text-emerald-700">{r.code}</Badge>
+                              : <span className="text-muted-foreground text-sm">-</span>}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground text-sm">{r.remarks || '-'}</TableCell>
+                          <TableCell>
+                            <div className="flex justify-center gap-1">
+                              <Button size="sm" variant="ghost" onClick={() => openEdit(r)}>
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                size="sm" variant="ghost"
+                                className="text-destructive hover:text-destructive"
+                                onClick={() => setDeleteId(r.id)}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* ═══════════════════════ SECTION 2 — MERGED LINE ═══════════════════════ */}
+          <div className="space-y-4">
+            {/* Divider */}
+            <div className="flex items-center gap-3">
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-violet-200 to-transparent" />
+              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-violet-50 border border-violet-200">
+                <GitMerge className="h-3.5 w-3.5 text-violet-500" />
+                <span className="text-xs font-semibold uppercase tracking-widest text-violet-500">Line Gabungan</span>
+              </div>
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-violet-200 to-transparent" />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-9 w-9 rounded-xl bg-violet-100 flex items-center justify-center">
+                  <GitMerge className="h-5 w-5 text-violet-700" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold tracking-tight text-violet-900">Merged Line</h2>
+                  <p className="text-violet-600 text-sm">Data line gabungan</p>
+                </div>
+              </div>
+              <Button
+                onClick={openAddMerged}
+                className="bg-violet-600 hover:bg-violet-700 text-white"
+                disabled={rows.length < 2}
+              >
+                <Plus className="h-4 w-4 mr-2" /> Tambah Merged Line
+              </Button>
+            </div>
+
+            <Card className="border-violet-100">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  Daftar Merged Line
+                  {!mergedLoading && (
+                    <Badge className="bg-violet-100 text-violet-800 hover:bg-violet-100">{mergedRows.length} data</Badge>
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {mergedLoading ? (
+                  <div className="flex justify-center py-16">
+                    <Loader2 className="h-6 w-6 animate-spin text-violet-600" />
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nama Merged Line</TableHead>
+                        <TableHead>Kode</TableHead>
+                        <TableHead>Line yang Digabung</TableHead>
+                        <TableHead>Remarks</TableHead>
+                        <TableHead className="text-center w-28">Aksi</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {mergedRows.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center py-12 text-violet-500">
+                            Belum ada merged line. Klik <strong>Tambah Merged Line</strong> untuk membuat.
+                          </TableCell>
+                        </TableRow>
+                      ) : mergedRows.map(r => (
+                        <TableRow key={r.id}>
+                          <TableCell className="font-medium">{r.name}</TableCell>
+                          <TableCell>
+                            {r.code
+                              ? <Badge variant="outline" className="border-violet-200 text-violet-700">{r.code}</Badge>
+                              : <span className="text-muted-foreground text-sm">-</span>}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-1.5">
+                              {r.members.map(m => (
+                                <Badge
+                                  key={m.line_id}
+                                  className="bg-teal-50 text-teal-700 border border-teal-200 hover:bg-teal-50 text-xs"
+                                >
+                                  {m.line_code ? `${m.line_code} – ` : ''}{m.line_name}
+                                </Badge>
+                              ))}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground text-sm">{r.remarks || '-'}</TableCell>
+                          <TableCell>
+                            <div className="flex justify-center gap-1">
+                              <Button size="sm" variant="ghost" onClick={() => openEditMerged(r)}>
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                size="sm" variant="ghost"
+                                className="text-destructive hover:text-destructive"
+                                onClick={() => setDeleteMergedId(r.id)}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>
 
-      <div className="p-8 space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-emerald-900">Master Line</h1>
-            <p className="text-emerald-600 text-sm mt-1">
-              Setiap line memiliki satu kode pakan aktif. Klik <strong>Ganti Kode Pakan</strong> untuk mengubahnya.
-            </p>
+      {/* ── Dialog: Tambah / Edit Master Line ─────────────────────────────────── */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>{editing ? 'Edit Line' : 'Tambah Line'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label>Nama Line <span className="text-destructive">*</span></Label>
+              <Input
+                placeholder="Contoh: Line 1"
+                value={form.name}
+                onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Kode Line</Label>
+              <Input
+                placeholder="Contoh: L1"
+                value={form.code}
+                onChange={e => setForm(f => ({ ...f, code: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Remarks</Label>
+              <Input
+                placeholder="Keterangan opsional"
+                value={form.remarks}
+                onChange={e => setForm(f => ({ ...f, remarks: e.target.value }))}
+              />
+            </div>
+            {formError && (
+              <div className="flex items-center gap-2 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                <AlertCircle className="h-4 w-4 shrink-0" />{formError}
+              </div>
+            )}
           </div>
-          <Button onClick={openAdd}><Plus className="h-4 w-4 mr-2" /> Tambah Line</Button>
-        </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={isSaving}>Batal</Button>
+            <Button onClick={handleSave} disabled={isSaving}>
+              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {editing ? 'Simpan' : 'Tambah'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              Daftar Line
-              {!isLoading && <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">{rows.length} data</Badge>}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-emerald-600" /></div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nama Line</TableHead>
-                    <TableHead>Kode Line</TableHead>
-                    <TableHead>
-                      <span className="flex items-center gap-1.5">
-                        <Tag className="h-3.5 w-3.5" /> Kode Pakan Aktif
-                      </span>
-                    </TableHead>
-                    <TableHead>Remarks</TableHead>
-                    <TableHead className="text-center w-36">Aksi</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rows.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center py-12 text-emerald-600">
-                        Belum ada data line
-                      </TableCell>
-                    </TableRow>
-                  ) : rows.map(r => (
-                    <TableRow key={r.id}>
-                      <TableCell className="font-medium">{r.name}</TableCell>
-                      <TableCell>
-                        {r.code
-                          ? <Badge variant="outline" className="border-emerald-200 text-emerald-700">{r.code}</Badge>
-                          : <span className="text-muted-foreground text-sm">-</span>}
-                      </TableCell>
-                      <TableCell>
-                        {r.current_feed_code_code ? (
-                          <div className="flex items-center gap-2">
-                            <Badge className="bg-blue-100 text-blue-700 border border-blue-200 hover:bg-blue-100">
-                              {r.current_feed_code_code}
-                            </Badge>
-                            <Button
-                              size="sm" variant="ghost"
-                              className="h-6 px-2 text-xs text-muted-foreground hover:text-blue-600"
-                              onClick={() => openFeedCodeDialog(r)}
-                            >
-                              <ArrowLeftRight className="h-3 w-3 mr-1" /> Ganti
-                            </Button>
-                          </div>
-                        ) : (
-                          <Button
-                            size="sm" variant="outline"
-                            className="h-7 text-xs border-dashed border-emerald-300 text-emerald-600 hover:border-emerald-500"
-                            onClick={() => openFeedCodeDialog(r)}
-                          >
-                            <Plus className="h-3 w-3 mr-1" /> Set Kode Pakan
-                          </Button>
+      {/* ── Dialog: Tambah / Edit Merged Line ─────────────────────────────────── */}
+      <Dialog open={mergedDialogOpen} onOpenChange={setMergedDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <GitMerge className="h-4 w-4 text-violet-600" />
+              {editingMerged ? 'Edit Merged Line' : 'Tambah Merged Line'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label>Nama Merged Line <span className="text-destructive">*</span></Label>
+              <Input
+                placeholder="Contoh: Line Gabungan A"
+                value={mergedForm.name}
+                onChange={e => setMergedForm(f => ({ ...f, name: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Kode</Label>
+              <Input
+                placeholder="Contoh: LG-A"
+                value={mergedForm.code}
+                onChange={e => setMergedForm(f => ({ ...f, code: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Remarks</Label>
+              <Input
+                placeholder="Keterangan opsional"
+                value={mergedForm.remarks}
+                onChange={e => setMergedForm(f => ({ ...f, remarks: e.target.value }))}
+              />
+            </div>
+
+            {/* Line checklist */}
+            <div className="space-y-2">
+              <Label>
+                Pilih Line yang Digabung <span className="text-destructive">*</span>
+                <span className="ml-1 text-xs text-muted-foreground font-normal">(minimal 2)</span>
+              </Label>
+              <div className="rounded-lg border divide-y max-h-52 overflow-y-auto">
+                {rows.length === 0 ? (
+                  <p className="text-sm text-center text-muted-foreground py-4">
+                    Belum ada master line.
+                  </p>
+                ) : rows.map(r => {
+                  const checked = mergedSelectedIds.includes(r.id)
+                  return (
+                    <div
+                      key={r.id}
+                      className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors ${
+                        checked ? 'bg-violet-50' : 'hover:bg-slate-50'
+                      }`}
+                      onClick={() => toggleMergedLine(r.id)}
+                    >
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={() => toggleMergedLine(r.id)}
+                        className="data-[state=checked]:bg-violet-600 data-[state=checked]:border-violet-600"
+                      />
+                      <div className="flex items-center gap-2 flex-1">
+                        <span className="text-sm font-medium">{r.name}</span>
+                        {r.code && (
+                          <Badge variant="outline" className="text-xs border-emerald-200 text-emerald-700">
+                            {r.code}
+                          </Badge>
                         )}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">{r.remarks || '-'}</TableCell>
-                      <TableCell>
-                        <div className="flex justify-center gap-1">
-                          <Button size="sm" variant="ghost" onClick={() => openEdit(r)}>
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => setDeleteId(r.id)}>
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-
-    {/* ── Dialog Tambah / Edit Line ─────────────────────────────────────────── */}
-    <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-      <DialogContent className="sm:max-w-[420px]">
-        <DialogHeader><DialogTitle>{editing ? 'Edit Line' : 'Tambah Line'}</DialogTitle></DialogHeader>
-        <div className="space-y-4 py-2">
-          <div className="space-y-1.5">
-            <Label>Nama Line <span className="text-destructive">*</span></Label>
-            <Input placeholder="Contoh: Line 1"
-              value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Kode Line</Label>
-            <Input placeholder="Contoh: L1"
-              value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value }))} />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Remarks</Label>
-            <Input placeholder="Keterangan opsional"
-              value={form.remarks} onChange={e => setForm(f => ({ ...f, remarks: e.target.value }))} />
-          </div>
-          {formError && (
-            <div className="flex items-center gap-2 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              <AlertCircle className="h-4 w-4 shrink-0" />{formError}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+              {mergedSelectedIds.length > 0 && (
+                <p className="text-xs text-violet-600">{mergedSelectedIds.length} line dipilih</p>
+              )}
             </div>
-          )}
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={isSaving}>Batal</Button>
-          <Button onClick={handleSave} disabled={isSaving}>
-            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {editing ? 'Simpan' : 'Tambah'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
 
-    {/* ── Dialog Ganti Kode Pakan ───────────────────────────────────────────── */}
-    <Dialog open={fcDialogOpen} onOpenChange={setFcDialogOpen}>
-      <DialogContent className="sm:max-w-[380px]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Tag className="h-4 w-4 text-blue-600" />
-            {fcTarget?.current_feed_code_id ? 'Ganti Kode Pakan' : 'Set Kode Pakan'}
-          </DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 py-2">
-          <p className="text-sm text-muted-foreground">
-            Line: <span className="font-medium text-foreground">{fcTarget?.name}</span>
-          </p>
-          {fcTarget?.current_feed_code_code && (
-            <div className="flex items-center gap-2 text-sm">
-              <span className="text-muted-foreground">Saat ini:</span>
-              <Badge className="bg-blue-100 text-blue-700 border border-blue-200">
-                {fcTarget.current_feed_code_code}
-              </Badge>
-            </div>
-          )}
-          <div className="space-y-1.5">
-            <Label>Kode Pakan Baru</Label>
-            <Select value={fcSelected} onValueChange={setFcSelected}>
-              <SelectTrigger>
-                <SelectValue placeholder="Pilih kode pakan..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">
-                  <span className="text-muted-foreground italic">— Tidak ada (hapus kode pakan) —</span>
-                </SelectItem>
-                {feedCodes.map(fc => (
-                  <SelectItem key={fc.id} value={String(fc.id)}>
-                    <span className="font-mono font-medium">{fc.code}</span>
-                    {fc.remarks && <span className="ml-2 text-muted-foreground text-xs">{fc.remarks}</span>}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {feedCodes.length === 0 && (
-              <p className="text-xs text-amber-600 mt-1">
-                Belum ada kode pakan. Tambahkan di menu Master → Kode Pakan terlebih dahulu.
-              </p>
+            {mergedFormError && (
+              <div className="flex items-center gap-2 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                <AlertCircle className="h-4 w-4 shrink-0" />{mergedFormError}
+              </div>
             )}
           </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setFcDialogOpen(false)} disabled={fcSaving}>Batal</Button>
-          <Button onClick={handleSetFeedCode} disabled={fcSaving || feedCodes.length === 0}>
-            {fcSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Simpan
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMergedDialogOpen(false)} disabled={mergedSaving}>Batal</Button>
+            <Button
+              onClick={handleSaveMerged}
+              disabled={mergedSaving}
+              className="bg-violet-600 hover:bg-violet-700"
+            >
+              {mergedSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {editingMerged ? 'Simpan' : 'Tambah'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-    <ConfirmDialog
-      open={!!deleteId} onClose={() => setDeleteId(null)} onConfirm={handleDelete}
-      title="Hapus Line"
-      description="Line akan dinonaktifkan. Kode pakan yang terpasang akan dilepas. Lanjutkan?"
-      confirmText="Hapus" isLoading={isDeleting}
-    />
-</OeeGuard>
+      {/* ── Confirm Dialogs ────────────────────────────────────────────────────── */}
+      <ConfirmDialog
+        open={!!deleteId} onClose={() => setDeleteId(null)} onConfirm={handleDelete}
+        title="Hapus Line"
+        description="Line akan dinonaktifkan. Data line individu tidak terpengaruh pada merged line yang sudah ada. Lanjutkan?"
+        confirmText="Hapus" isLoading={isDeleting}
+      />
+      <ConfirmDialog
+        open={!!deleteMergedId} onClose={() => setDeleteMergedId(null)} onConfirm={handleDeleteMerged}
+        title="Hapus Merged Line"
+        description="Merged line ini akan dihapus. Data line individu tidak terpengaruh. Lanjutkan?"
+        confirmText="Hapus" isLoading={isDeletingMerged}
+      />
+    </OeeGuard>
   )
 }

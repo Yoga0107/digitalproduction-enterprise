@@ -67,8 +67,6 @@ export interface ApiFeedCode {
 export interface ApiLine {
   id: number; plant_id: number; name: string;
   code: string | null; remarks: string | null;
-  current_feed_code_id: number | null;
-  current_feed_code_code: string | null;
   is_active: boolean; created_at: string; created_by_id: number | null;
 }
 
@@ -85,9 +83,15 @@ export interface ApiProductionOutput {
   shift_id: number
   feed_code_id: number | null
   production_plan: number | null
+  // 5 input fields
+  finished_goods: number
+  downgraded_product: number
+  wip: number
+  remix: number
+  reject_product: number
+  // computed
   actual_output: number
   good_product: number
-  reject_product: number
   quality_rate: number
   remarks: string | null
   is_active: boolean
@@ -122,4 +126,21 @@ export interface ApiMachineLossInput {
   loss_l1_name: string | null
   loss_l2_name: string | null
   loss_l3_name: string | null
+}
+
+export interface ApiMergedLineMember {
+  line_id: number
+  line_name: string
+  line_code: string | null
+}
+
+export interface ApiMergedLine {
+  id: number
+  name: string
+  code: string | null
+  remarks: string | null
+  is_active: boolean
+  created_at: string
+  created_by_id: number | null
+  members: ApiMergedLineMember[]
 }

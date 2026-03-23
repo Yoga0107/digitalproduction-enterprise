@@ -25,6 +25,7 @@ const ROLE_LABEL: Record<string, string> = {
   viewer:        'Viewer',
 }
 
+
 function initials(name: string) {
   return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 }
@@ -123,7 +124,7 @@ export function UserTable({ users, plants, isLoading, onEdit, onToggleActive, on
                     {/* Plant access */}
                     <TableCell>
                       <div className="flex flex-wrap gap-1 max-w-[260px]">
-                        {u.plant_ids.length === 0 ? (
+                        {!u.plant_ids || u.plant_ids.length === 0 ? (
                           <span className="text-xs text-muted-foreground italic">No access</span>
                         ) : u.plant_ids.map(pid => {
                           const p = plantById[pid]

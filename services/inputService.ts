@@ -33,8 +33,11 @@ export const createProductionOutput = (data: {
   shift_id: number
   feed_code_id?: number | null
   production_plan?: number | null
-  actual_output: number
-  good_product: number
+  finished_goods: number
+  downgraded_product: number
+  wip: number
+  remix: number
+  reject_product: number
   remarks?: string
 }) => api.post<ApiProductionOutput>('/api/v1/input/production-outputs', data)
 
@@ -46,8 +49,11 @@ export const updateProductionOutput = (
     shift_id: number
     feed_code_id: number | null
     production_plan: number | null
-    actual_output: number
-    good_product: number
+    finished_goods: number
+    downgraded_product: number
+    wip: number
+    remix: number
+    reject_product: number
     remarks: string
   }>
 ) => api.put<ApiProductionOutput>(`/api/v1/input/production-outputs/${id}`, data)
