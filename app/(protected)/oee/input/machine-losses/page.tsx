@@ -3,10 +3,13 @@
 import { useState, useEffect, useCallback } from 'react'
 import { OeeGuard } from '@/components/oee/oee-guard'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { ConfirmDialog } from '@/components/confirm-dialog'
-import { Wrench, Plus } from 'lucide-react'
+import { Wrench, Plus, Calendar, Factory, Clock, Tag, FileText, ChevronRight, Pencil, Eye } from 'lucide-react'
 import { toast } from 'sonner'
 import { ApiError } from '@/lib/api-client'
+import { cn } from '@/lib/utils'
 
 import { MachineLossFilterBar }    from '@/components/oee/machine-loss-filter-bar'
 import { MachineLossKpiCards }     from '@/components/oee/machine-loss-kpi-cards'
@@ -21,122 +24,228 @@ import {
   getMachineLossInputs, createMachineLossInput,
   updateMachineLossInput, deleteMachineLossInput,
 } from '@/services/inputService'
-import { getLines, getShifts, getMachineLosses } from '@/services/masterService'
-import { ApiMachineLossInput, ApiLine, ApiShift, ApiMachineLoss } from '@/types/api'
+import { getLines, getShifts, getMachineLosses, getFeedCodes } from '@/services/masterService'
+import { ApiMachineLossInput, ApiLine, ApiShift, ApiMachineLoss, ApiFeedCode } from '@/types/api'
+import { fmtDate, fmtHours } from '@/lib/machine-loss-utils'
 
+// ─── View Detail Dialog ───────────────────────────────────────────────────────
+function MachineLossDetailDialog({
+  row, onClose, onEdit,
+}: {
+  row: ApiMachineLossInput | null
+  onClose: () => void
+  onEdit: (r: ApiMachineLossInput) => void
+}) {
+  if (!row) return null
+
+  return (
+    <Dialog open={!!row} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[500px] max-h-[92vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Wrench className="h-5 w-5 text-teal-600" />
+            Detail Machine Loss
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4 py-1">
+
+          {/* Konteks */}
+          <div className="grid grid-cols-2 gap-2.5">
+            {[
+              { icon: Calendar, label: 'Tanggal', value: fmtDate(row.date) },
+              { icon: Clock,    label: 'Shift',   value: row.shift_name ?? '—' },
+              { icon: Factory,  label: 'Line',    value: row.line_name  ?? '—' },
+              { icon: Tag,      label: 'Kode Pakan', value: row.feed_code_code ?? '—', mono: true },
+            ].map(({ icon: Icon, label, value, mono }) => (
+              <div key={label} className="rounded-lg border bg-slate-50 px-3 py-2.5 space-y-0.5">
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Icon className="h-3 w-3" />{label}
+                </div>
+                <p className={cn('font-semibold text-sm', mono && 'font-mono')}>{value}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Kategori Kerugian */}
+          <div className="rounded-xl border overflow-hidden">
+            <div className="bg-slate-50 px-4 py-2.5 border-b">
+              <span className="text-xs font-semibold text-slate-600 uppercase tracking-widest">
+                Machine Losses
+              </span>
+            </div>
+            <div className="p-4 space-y-3">
+              {/* L1 */}
+              <div className="flex items-start gap-3">
+                <span className="px-2 py-0.5 rounded bg-red-100 text-red-700 text-[10px] font-bold shrink-0 mt-0.5">L1</span>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">Kategori Utama</p>
+                  {row.loss_l1_name
+                    ? <Badge className="bg-red-100 text-red-700 border border-red-200 hover:bg-red-100">{row.loss_l1_name}</Badge>
+                    : <span className="text-sm text-muted-foreground">—</span>}
+                </div>
+              </div>
+
+              {/* L2 */}
+              {row.loss_l2_name && (
+                <div className="flex items-start gap-3 pl-4">
+                  <ChevronRight className="h-3.5 w-3.5 text-slate-300 mt-1 shrink-0" />
+                  <span className="px-2 py-0.5 rounded bg-violet-100 text-violet-700 text-[10px] font-bold shrink-0 mt-0.5">L2</span>
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-0.5">Sub-Kategori</p>
+                    <Badge className="bg-violet-100 text-violet-700 border border-violet-200 hover:bg-violet-100">{row.loss_l2_name}</Badge>
+                  </div>
+                </div>
+              )}
+
+              {/* L3 */}
+              {row.loss_l3_name && (
+                <div className="flex items-start gap-3 pl-8">
+                  <ChevronRight className="h-3.5 w-3.5 text-slate-300 mt-1 shrink-0" />
+                  <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[10px] font-bold shrink-0 mt-0.5">L3</span>
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-0.5">Detail Kerugian</p>
+                    <Badge className="bg-emerald-100 text-emerald-700 border border-emerald-200 hover:bg-emerald-100">{row.loss_l3_name}</Badge>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Waktu & Durasi */}
+          <div className="rounded-xl border border-orange-100 bg-orange-50/40 overflow-hidden">
+            <div className="bg-orange-50 px-4 py-2.5 border-b border-orange-100">
+              <span className="text-xs font-semibold text-orange-700 uppercase tracking-widest">Waktu & Durasi</span>
+            </div>
+            <div className="grid grid-cols-3 divide-x divide-orange-100">
+              <div className="px-4 py-3 text-center">
+                <p className="text-xs text-muted-foreground mb-1">Mulai</p>
+                <p className="font-mono font-semibold text-sm">{row.time_from ?? '—'}</p>
+              </div>
+              <div className="px-4 py-3 text-center">
+                <p className="text-xs text-muted-foreground mb-1">Selesai</p>
+                <p className="font-mono font-semibold text-sm">{row.time_to ?? '—'}</p>
+              </div>
+              <div className="px-4 py-3 text-center">
+                <p className="text-xs text-muted-foreground mb-1">Durasi</p>
+                <p className="font-bold text-orange-600 text-lg">{fmtHours(row.duration_minutes)}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Remarks */}
+          {row.remarks && (
+            <div className="rounded-lg border bg-slate-50 px-4 py-3 space-y-1">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <FileText className="h-3 w-3" /> Keterangan
+              </div>
+              <p className="text-sm">{row.remarks}</p>
+            </div>
+          )}
+        </div>
+
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={onClose}>Tutup</Button>
+          <Button className="bg-teal-600 hover:bg-teal-700"
+            onClick={() => { onClose(); onEdit(row) }}>
+            <Pencil className="h-4 w-4 mr-2" /> Edit
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 export default function MachineLossInputPage() {
-  // ── Master data ──────────────────────────────────────────────────────────
-  const [lines, setLines]       = useState<ApiLine[]>([])
-  const [shifts, setShifts]     = useState<ApiShift[]>([])
+  const [lines, setLines]         = useState<ApiLine[]>([])
+  const [shifts, setShifts]       = useState<ApiShift[]>([])
   const [allLosses, setAllLosses] = useState<ApiMachineLoss[]>([])
+  const [feedCodes, setFeedCodes] = useState<ApiFeedCode[]>([])
 
-  // ── Records ───────────────────────────────────────────────────────────────
   const [rows, setRows]           = useState<ApiMachineLossInput[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
-  // ── Filters ───────────────────────────────────────────────────────────────
   const [filterDate,  setFilterDate]  = useState('')
   const [filterLine,  setFilterLine]  = useState('all')
   const [filterShift, setFilterShift] = useState('all')
 
-  // ── Dialog ────────────────────────────────────────────────────────────────
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing]       = useState<ApiMachineLossInput | null>(null)
   const [form, setForm]             = useState<MachineLossFormState>(EMPTY_LOSS_FORM)
   const [formError, setFormError]   = useState('')
   const [isSaving, setIsSaving]     = useState(false)
 
-  // ── Delete ────────────────────────────────────────────────────────────────
+  const [viewRow, setViewRow]       = useState<ApiMachineLossInput | null>(null)
   const [deleteId, setDeleteId]     = useState<number | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
-
-  // ── Load ──────────────────────────────────────────────────────────────────
 
   const load = useCallback(async () => {
     try {
       setIsLoading(true)
-      const [inputData, lineData, shiftData, lossData] = await Promise.all([
-        getMachineLossInputs(),
-        getLines(),
-        getShifts(),
-        getMachineLosses(),
+      const [inputData, lineData, shiftData, lossData, fcData] = await Promise.all([
+        getMachineLossInputs(), getLines(), getShifts(), getMachineLosses(), getFeedCodes(),
       ])
       setRows(inputData)
       setLines(lineData.filter(l => l.is_active))
       setShifts(shiftData.filter(s => s.is_active))
       setAllLosses(lossData.filter(l => l.is_active))
-    } catch {
-      toast.error('Failed to load data')
-    } finally {
-      setIsLoading(false)
-    }
+      setFeedCodes(fcData.filter(f => f.is_active))
+    } catch { toast.error('Gagal memuat data') }
+    finally { setIsLoading(false) }
   }, [])
 
   useEffect(() => { load() }, [load])
 
-  // ── Dialog handlers ───────────────────────────────────────────────────────
-
-  function openAdd() {
-    setEditing(null); setForm(EMPTY_LOSS_FORM); setFormError(''); setDialogOpen(true)
-  }
+  function openAdd() { setEditing(null); setForm(EMPTY_LOSS_FORM); setFormError(''); setDialogOpen(true) }
 
   function openEdit(row: ApiMachineLossInput) {
     setEditing(row)
     setForm({
-      date:           row.date.slice(0, 10),
-      line_id:        String(row.line_id),
-      shift_id:       String(row.shift_id),
-      feed_code_id:   row.feed_code_id  ? String(row.feed_code_id)  : '',
-      loss_l1_id:     row.loss_l1_id    ? String(row.loss_l1_id)    : '',
-      loss_l2_id:     row.loss_l2_id    ? String(row.loss_l2_id)    : '',
-      loss_l3_id:     row.loss_l3_id    ? String(row.loss_l3_id)    : '',
-      time_from:      row.time_from     ?? '',
-      time_to:        row.time_to       ?? '',
-      duration_hours: String(row.duration_minutes), // stored as hours in DB field named duration_minutes
-      remarks:        row.remarks       ?? '',
+      date: row.date.slice(0, 10), line_id: String(row.line_id), shift_id: String(row.shift_id),
+      feed_code_id: row.feed_code_id ? String(row.feed_code_id) : '',
+      loss_l1_id: row.loss_l1_id ? String(row.loss_l1_id) : '',
+      loss_l2_id: row.loss_l2_id ? String(row.loss_l2_id) : '',
+      loss_l3_id: row.loss_l3_id ? String(row.loss_l3_id) : '',
+      time_from: row.time_from ?? '', time_to: row.time_to ?? '',
+      duration_hours: String(row.duration_minutes), remarks: row.remarks ?? '',
     })
     setFormError(''); setDialogOpen(true)
   }
 
   async function handleSave() {
     setFormError('')
-    if (!form.date)           { setFormError('Date is required.');                   return }
-    if (!form.line_id)        { setFormError('Line is required.');                   return }
-    if (!form.shift_id)       { setFormError('Shift is required.');                  return }
-    if (!form.loss_l1_id)     { setFormError('Loss Category (L1) is required.');     return }
-    if (!form.duration_hours || Number(form.duration_hours) <= 0) {
-      setFormError('Duration must be greater than 0.')
-      return
-    }
+    if (!form.date)       { setFormError('Tanggal wajib diisi.'); return }
+    if (!form.line_id)    { setFormError('Line wajib dipilih.'); return }
+    if (!form.shift_id)   { setFormError('Shift wajib dipilih.'); return }
+    if (!form.loss_l1_id) { setFormError('Kategori kerugian (L1) wajib dipilih.'); return }
+    const dur = Number(form.duration_hours)
+    if (!form.duration_hours || dur <= 0) { setFormError('Durasi harus lebih dari 0.'); return }
 
     setIsSaving(true)
     try {
       const payload = {
-        date:             new Date(form.date).toISOString(),
-        line_id:          Number(form.line_id),
-        shift_id:         Number(form.shift_id),
-        feed_code_id:     form.feed_code_id ? Number(form.feed_code_id) : null,
-        loss_l1_id:       form.loss_l1_id   ? Number(form.loss_l1_id)   : null,
-        loss_l2_id:       form.loss_l2_id   ? Number(form.loss_l2_id)   : null,
-        loss_l3_id:       form.loss_l3_id   ? Number(form.loss_l3_id)   : null,
-        time_from:        form.time_from     || null,
-        time_to:          form.time_to       || null,
-        duration_minutes: Number(form.duration_hours), // field name kept for API compat
-        remarks:          form.remarks       || undefined,
+        date: new Date(form.date).toISOString(), line_id: Number(form.line_id), shift_id: Number(form.shift_id),
+        feed_code_id: form.feed_code_id ? Number(form.feed_code_id) : null,
+        loss_l1_id: form.loss_l1_id ? Number(form.loss_l1_id) : null,
+        loss_l2_id: form.loss_l2_id ? Number(form.loss_l2_id) : null,
+        loss_l3_id: form.loss_l3_id ? Number(form.loss_l3_id) : null,
+        time_from: form.time_from || null, time_to: form.time_to || null,
+        duration_minutes: dur, remarks: form.remarks || undefined,
       }
       if (editing) {
         const u = await updateMachineLossInput(editing.id, payload)
         setRows(prev => prev.map(r => r.id === editing.id ? u : r))
-        toast.success('Record updated')
+        toast.success('Data berhasil diperbarui')
       } else {
         const c = await createMachineLossInput(payload)
         setRows(prev => [c, ...prev])
-        toast.success('Record saved')
+        toast.success('Data berhasil disimpan')
       }
       setDialogOpen(false)
     } catch (err) {
       if (err instanceof ApiError) setFormError(err.detail)
-      else toast.error('Failed to save record')
+      else toast.error('Gagal menyimpan data')
     } finally { setIsSaving(false) }
   }
 
@@ -146,13 +255,10 @@ export default function MachineLossInputPage() {
     try {
       await deleteMachineLossInput(deleteId)
       setRows(prev => prev.filter(r => r.id !== deleteId))
-      toast.success('Record deleted')
-    } catch {
-      toast.error('Failed to delete record')
-    } finally { setIsDeleting(false); setDeleteId(null) }
+      toast.success('Data berhasil dihapus')
+    } catch { toast.error('Gagal menghapus data') }
+    finally { setIsDeleting(false); setDeleteId(null) }
   }
-
-  // ── Derived state ─────────────────────────────────────────────────────────
 
   const filtered = rows.filter(r => {
     if (filterDate  && !r.date.startsWith(filterDate))               return false
@@ -161,105 +267,70 @@ export default function MachineLossInputPage() {
     return true
   })
 
-  const totalHours = filtered.reduce((s, r) => s + r.duration_minutes, 0)
-  const avgHours   = filtered.length > 0 ? totalHours / filtered.length : 0
-
+  const totalMinutes = filtered.reduce((s, r) => s + r.duration_minutes, 0)
+  const avgMinutes   = filtered.length > 0 ? totalMinutes / filtered.length : 0
   const byL1: Record<string, number> = {}
-  filtered.forEach(r => {
-    const k = r.loss_l1_name ?? 'Unknown'
-    byL1[k] = (byL1[k] ?? 0) + r.duration_minutes
-  })
+  filtered.forEach(r => { const k = r.loss_l1_name ?? 'Unknown'; byL1[k] = (byL1[k] ?? 0) + r.duration_minutes })
   const topL1 = Object.entries(byL1).sort((a, b) => b[1] - a[1])[0]?.[0] ?? ''
-
-  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <OeeGuard section="input">
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-teal-50/20">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-teal-50/20">
+        <div className="relative overflow-hidden bg-gradient-to-r from-teal-700 to-emerald-600 px-8 py-10">
+          <div className="absolute -top-8 -right-8 h-40 w-40 rounded-full bg-white/5" />
+          <div className="relative flex items-center gap-4">
+            <div className="h-14 w-14 rounded-2xl bg-white/15 backdrop-blur flex items-center justify-center">
+              <Wrench className="h-7 w-7 text-white" />
+            </div>
+            <div>
+              <p className="text-white/60 text-xs font-semibold uppercase tracking-widest mb-1">Input Data</p>
+              <h2 className="text-3xl font-bold text-white tracking-tight">Machine Loss</h2>
+              <p className="text-white/70 text-sm mt-1">Input downtime harian per shift per line</p>
+            </div>
+          </div>
+        </div>
 
-      {/* Page header */}
-      <div className="relative overflow-hidden bg-gradient-to-r from-teal-700 to-emerald-600 px-8 py-10">
-        <div className="absolute -top-8 -right-8 h-40 w-40 rounded-full bg-white/5" />
-        <div className="relative flex items-center gap-4">
-          <div className="h-14 w-14 rounded-2xl bg-white/15 backdrop-blur flex items-center justify-center">
-            <Wrench className="h-7 w-7 text-white" />
+        <div className="p-8 space-y-6">
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">Machine Loss Input</h1>
+              <p className="text-sm text-slate-500 mt-0.5">Klik baris untuk melihat detail lengkap</p>
+            </div>
+            <Button className="bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 shadow-sm" onClick={openAdd}>
+              <Plus className="h-4 w-4 mr-2" /> Tambah Data
+            </Button>
           </div>
-          <div>
-            <p className="text-white/60 text-xs font-semibold uppercase tracking-widest mb-1">
-              Input Data
-            </p>
-            <h2 className="text-3xl font-bold text-white tracking-tight">Machine Loss</h2>
-            <p className="text-white/70 text-sm mt-1">Daily downtime entry per shift per line</p>
-          </div>
+
+          <MachineLossFilterBar
+            filterDate={filterDate} filterLine={filterLine} filterShift={filterShift}
+            lines={lines} shifts={shifts}
+            onDateChange={setFilterDate} onLineChange={setFilterLine} onShiftChange={setFilterShift}
+            onClear={() => { setFilterDate(''); setFilterLine('all'); setFilterShift('all') }}
+          />
+
+          <MachineLossKpiCards totalEvents={filtered.length} totalHours={totalMinutes}
+            avgHours={avgMinutes} topLossType={topL1} />
+
+          {/* Pass view handler to table */}
+          <MachineLossHistoryTable rows={filtered} isLoading={isLoading}
+            onEdit={openEdit} onDelete={setDeleteId} onView={setViewRow} />
         </div>
       </div>
 
-      <div className="p-8 space-y-6">
+      <MachineLossDetailDialog row={viewRow} onClose={() => setViewRow(null)}
+        onEdit={row => { setViewRow(null); openEdit(row) }} />
 
-        {/* Toolbar */}
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Machine Loss Input</h1>
-            <p className="text-sm text-slate-500 mt-0.5">
-              Loss category cascades L1 → L2 → L3. Duration in hours.
-            </p>
-          </div>
-          <Button
-            className="bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 shadow-sm"
-            onClick={openAdd}
-          >
-            <Plus className="h-4 w-4 mr-2" /> Add Loss Entry
-          </Button>
-        </div>
+      <MachineLossEntryDialog
+        open={dialogOpen} isEditing={!!editing} isSaving={isSaving}
+        form={form} formError={formError}
+        lines={lines} shifts={shifts} feedCodes={feedCodes} allLosses={allLosses}
+        onFormChange={setForm} onSave={handleSave} onClose={() => setDialogOpen(false)}
+      />
 
-        <MachineLossFilterBar
-          filterDate={filterDate}  filterLine={filterLine}  filterShift={filterShift}
-          lines={lines}            shifts={shifts}
-          onDateChange={setFilterDate}
-          onLineChange={setFilterLine}
-          onShiftChange={setFilterShift}
-          onClear={() => { setFilterDate(''); setFilterLine('all'); setFilterShift('all') }}
-        />
-
-        <MachineLossKpiCards
-          totalEvents={filtered.length}
-          totalHours={totalHours}
-          avgHours={avgHours}
-          topLossType={topL1}
-        />
-
-        <MachineLossHistoryTable
-          rows={filtered}
-          isLoading={isLoading}
-          onEdit={openEdit}
-          onDelete={setDeleteId}
-        />
-      </div>
-    </div>
-
-    <MachineLossEntryDialog
-      open={dialogOpen}
-      isEditing={!!editing}
-      isSaving={isSaving}
-      form={form}
-      formError={formError}
-      lines={lines}
-      shifts={shifts}
-      allLosses={allLosses}
-      onFormChange={setForm}
-      onSave={handleSave}
-      onClose={() => setDialogOpen(false)}
-    />
-
-    <ConfirmDialog
-      open={!!deleteId}
-      onClose={() => setDeleteId(null)}
-      onConfirm={handleDelete}
-      title="Delete Loss Record"
-      description="This downtime record will be permanently removed. Continue?"
-      confirmText="Delete"
-      isLoading={isDeleting}
-    />
-  </OeeGuard>
+      <ConfirmDialog open={!!deleteId} onClose={() => setDeleteId(null)} onConfirm={handleDelete}
+        title="Hapus Data Machine Loss"
+        description="Data downtime ini akan dihapus secara permanen. Lanjutkan?"
+        confirmText="Hapus" isLoading={isDeleting} />
+    </OeeGuard>
   )
 }

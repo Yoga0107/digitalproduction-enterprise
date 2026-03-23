@@ -26,8 +26,9 @@ import { getLines, getShifts, getFeedCodes } from '@/services/masterService'
 import { ApiProductionOutput, ApiLine, ApiShift, ApiFeedCode } from '@/types/api'
 import { toast } from 'sonner'
 import {
-  Loader2, Plus, Pencil, Trash2, Activity,
+  Loader2, Plus, Pencil, Trash2, Activity, Eye,
   AlertCircle, TrendingUp, Package, Star, RotateCcw, XCircle, CheckCircle2,
+  Calendar, Factory, Clock, Tag, FileText,
 } from 'lucide-react'
 import { ApiError } from '@/lib/api-client'
 import { cn } from '@/lib/utils'
@@ -61,39 +62,147 @@ const EMPTY_FORM: FormState = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function n(s: string) { return Number(s) || 0 }
-
 function computeLive(form: FormState) {
-  const fg  = n(form.finished_goods)
-  const dg  = n(form.downgraded_product)
-  const wip = n(form.wip)
-  const rmx = n(form.remix)
-  const rej = n(form.reject_product)
-  const actual  = fg + dg + wip + rmx + rej
-  const quality = actual > 0 ? parseFloat(((fg / actual) * 100).toFixed(2)) : 0
-  return { actual, quality }
+  const fg = n(form.finished_goods), dg = n(form.downgraded_product)
+  const wip = n(form.wip), rmx = n(form.remix), rej = n(form.reject_product)
+  const actual = fg + dg + wip + rmx + rej
+  return { actual, quality: actual > 0 ? parseFloat(((fg / actual) * 100).toFixed(2)) : 0 }
 }
-
 function fmt(v: number | null | undefined) {
   if (v == null) return '-'
   return v.toLocaleString('id-ID')
 }
-
 function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString('id-ID', {
-    day: '2-digit', month: 'short', year: 'numeric',
-  })
+  return new Date(iso).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
 }
-
 function qualityColor(rate: number) {
   if (rate >= 98) return 'text-emerald-600'
   if (rate >= 95) return 'text-yellow-600'
   return 'text-red-600'
 }
-
 function qualityBg(rate: number) {
   if (rate >= 98) return 'bg-emerald-500'
   if (rate >= 95) return 'bg-yellow-400'
   return 'bg-red-500'
+}
+
+// ─── View Detail Dialog ───────────────────────────────────────────────────────
+function OutputDetailDialog({
+  row, onClose, onEdit,
+}: {
+  row: ApiProductionOutput | null
+  onClose: () => void
+  onEdit: (r: ApiProductionOutput) => void
+}) {
+  if (!row) return null
+  const quality = row.actual_output > 0
+    ? parseFloat(((row.finished_goods / row.actual_output) * 100).toFixed(2)) : 0
+
+  const items = [
+    { label: 'Finished Goods',    value: row.finished_goods,    barColor: 'bg-teal-500',   text: 'text-teal-700',   bg: 'bg-teal-50'   },
+    { label: 'Downgraded',        value: row.downgraded_product, barColor: 'bg-blue-500',   text: 'text-blue-700',   bg: 'bg-blue-50'   },
+    { label: 'WIP',               value: row.wip,               barColor: 'bg-yellow-400', text: 'text-yellow-700', bg: 'bg-yellow-50' },
+    { label: 'Remix',             value: row.remix,             barColor: 'bg-orange-400', text: 'text-orange-700', bg: 'bg-orange-50' },
+    { label: 'Reject',            value: row.reject_product,    barColor: 'bg-red-500',    text: 'text-red-700',    bg: 'bg-red-50'    },
+  ]
+
+  return (
+    <Dialog open={!!row} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[540px] max-h-[92vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Activity className="h-5 w-5 text-emerald-600" />
+            Detail Production Output
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4 py-1">
+          {/* Konteks */}
+          <div className="grid grid-cols-2 gap-2.5">
+            {[
+              { icon: Calendar, label: 'Tanggal',    value: fmtDate(row.date) },
+              { icon: Clock,    label: 'Shift',      value: row.shift_name ?? '—' },
+              { icon: Factory,  label: 'Line',       value: row.line_name ?? '—' },
+              { icon: Tag,      label: 'Kode Pakan', value: row.feed_code_code ?? '—', mono: true },
+            ].map(({ icon: Icon, label, value, mono }) => (
+              <div key={label} className="rounded-lg border bg-slate-50 px-3 py-2.5 space-y-0.5">
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Icon className="h-3 w-3" />{label}
+                </div>
+                <p className={cn('font-semibold text-sm', mono && 'font-mono')}>{value}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Output breakdown */}
+          <div className="rounded-xl border border-emerald-100 overflow-hidden">
+            <div className="bg-emerald-50 px-4 py-2.5 flex items-center justify-between border-b border-emerald-100">
+              <span className="text-xs font-semibold text-emerald-700 uppercase tracking-widest">Breakdown Output</span>
+              <span className="text-sm font-bold text-emerald-800">Total: {fmt(row.actual_output)} kg</span>
+            </div>
+            <div className="divide-y divide-slate-100">
+              {items.map(item => {
+                const pct = row.actual_output > 0 ? ((item.value / row.actual_output) * 100) : 0
+                return (
+                  <div key={item.label} className={cn('flex items-center gap-3 px-4 py-3', item.bg)}>
+                    <div className={cn('w-1.5 h-8 rounded-full shrink-0', item.barColor)} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className={cn('text-xs font-semibold', item.text)}>{item.label}</span>
+                        <span className={cn('text-xs', item.text)}>{pct.toFixed(1)}%</span>
+                      </div>
+                      <div className="h-1.5 w-full bg-white/70 rounded-full overflow-hidden">
+                        <div className={cn('h-full rounded-full', item.barColor)} style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                    <span className={cn('text-sm font-bold tabular-nums w-24 text-right shrink-0', item.text)}>
+                      {fmt(item.value)} kg
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Quality Rate */}
+          <div className="rounded-xl border border-violet-100 bg-gradient-to-r from-violet-50 to-indigo-50 p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-semibold text-violet-700 uppercase tracking-widest">Quality Rate</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Finished Goods ÷ Total Output × 100</p>
+              </div>
+              <p className={cn('text-4xl font-black tabular-nums', qualityColor(quality))}>{quality.toFixed(1)}%</p>
+            </div>
+            <div className="h-3 w-full bg-white/70 rounded-full overflow-hidden border border-violet-100">
+              <div className={cn('h-full rounded-full transition-all', qualityBg(quality))}
+                style={{ width: `${Math.min(quality, 100)}%` }} />
+            </div>
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>0%</span><span className="text-emerald-600 font-medium">Target ≥ 98%</span><span>100%</span>
+            </div>
+          </div>
+
+          {/* Remarks */}
+          {row.remarks && (
+            <div className="rounded-lg border bg-slate-50 px-4 py-3 space-y-1">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <FileText className="h-3 w-3" /> Keterangan
+              </div>
+              <p className="text-sm">{row.remarks}</p>
+            </div>
+          )}
+        </div>
+
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={onClose}>Tutup</Button>
+          <Button className="bg-emerald-600 hover:bg-emerald-700"
+            onClick={() => { onClose(); onEdit(row) }}>
+            <Pencil className="h-4 w-4 mr-2" /> Edit
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
 }
 
 // ─── Page ──────────────────────────────────────────────────────────────────────
@@ -109,65 +218,46 @@ export default function OutputPage() {
   const [editing, setEditing]       = useState<ApiProductionOutput | null>(null)
   const [form, setForm]             = useState<FormState>(EMPTY_FORM)
   const [formError, setFormError]   = useState('')
+  const [viewRow, setViewRow]       = useState<ApiProductionOutput | null>(null)
 
   const [filterDate, setFilterDate]   = useState('')
   const [filterLine, setFilterLine]   = useState('all')
   const [filterShift, setFilterShift] = useState('all')
+  const [deleteId, setDeleteId]       = useState<number | null>(null)
+  const [isDeleting, setIsDeleting]   = useState(false)
 
-  const [deleteId, setDeleteId]     = useState<number | null>(null)
-  const [isDeleting, setIsDeleting] = useState(false)
-
-  // Live quality gimmick
   const { actual: liveActual, quality: liveQuality } = computeLive(form)
 
-  // ── Data load ─────────────────────────────────────────────────────────────
   const load = useCallback(async () => {
     try {
       setIsLoading(true)
       const [outputData, lineData, shiftData, fcData] = await Promise.all([
-        getProductionOutputs(),
-        getLines(),
-        getShifts(),
-        getFeedCodes(),
+        getProductionOutputs(), getLines(), getShifts(), getFeedCodes(),
       ])
       setRows(outputData)
       setLines(lineData.filter(l => l.is_active))
       setShifts(shiftData.filter(s => s.is_active))
       setFeedCodes(fcData.filter(f => f.is_active))
-    } catch {
-      toast.error('Gagal memuat data')
-    } finally {
-      setIsLoading(false)
-    }
+    } catch { toast.error('Gagal memuat data') }
+    finally { setIsLoading(false) }
   }, [])
 
   useEffect(() => { load() }, [load])
 
-  // ── Form helpers ──────────────────────────────────────────────────────────
-  function setField(key: keyof FormState, value: string) {
-    setForm(f => ({ ...f, [key]: value }))
-  }
+  function setField(key: keyof FormState, value: string) { setForm(f => ({ ...f, [key]: value })) }
 
-  function openAdd() {
-    setEditing(null); setForm(EMPTY_FORM); setFormError(''); setDialogOpen(true)
-  }
+  function openAdd() { setEditing(null); setForm(EMPTY_FORM); setFormError(''); setDialogOpen(true) }
 
   function openEdit(row: ApiProductionOutput) {
     setEditing(row)
     setForm({
-      date:               row.date.slice(0, 10),
-      line_id:            String(row.line_id),
-      shift_id:           String(row.shift_id),
-      feed_code_id:       row.feed_code_id ? String(row.feed_code_id) : '',
-      finished_goods:     String(row.finished_goods),
-      downgraded_product: String(row.downgraded_product),
-      wip:                String(row.wip),
-      remix:              String(row.remix),
-      reject_product:     String(row.reject_product),
-      remarks:            row.remarks ?? '',
+      date: row.date.slice(0, 10), line_id: String(row.line_id), shift_id: String(row.shift_id),
+      feed_code_id: row.feed_code_id ? String(row.feed_code_id) : '',
+      finished_goods: String(row.finished_goods), downgraded_product: String(row.downgraded_product),
+      wip: String(row.wip), remix: String(row.remix), reject_product: String(row.reject_product),
+      remarks: row.remarks ?? '',
     })
-    setFormError('')
-    setDialogOpen(true)
+    setFormError(''); setDialogOpen(true)
   }
 
   async function handleSave() {
@@ -175,20 +265,14 @@ export default function OutputPage() {
     if (!form.date)     { setFormError('Tanggal wajib diisi.'); return }
     if (!form.line_id)  { setFormError('Line wajib dipilih.'); return }
     if (!form.shift_id) { setFormError('Shift wajib dipilih.'); return }
-
     setIsSaving(true)
     try {
       const payload = {
-        date:               new Date(form.date).toISOString(),
-        line_id:            Number(form.line_id),
-        shift_id:           Number(form.shift_id),
-        feed_code_id:       form.feed_code_id ? Number(form.feed_code_id) : null,
-        finished_goods:     n(form.finished_goods),
-        downgraded_product: n(form.downgraded_product),
-        wip:                n(form.wip),
-        remix:              n(form.remix),
-        reject_product:     n(form.reject_product),
-        remarks:            form.remarks || undefined,
+        date: new Date(form.date).toISOString(), line_id: Number(form.line_id), shift_id: Number(form.shift_id),
+        feed_code_id: form.feed_code_id ? Number(form.feed_code_id) : null,
+        finished_goods: n(form.finished_goods), downgraded_product: n(form.downgraded_product),
+        wip: n(form.wip), remix: n(form.remix), reject_product: n(form.reject_product),
+        remarks: form.remarks || undefined,
       }
       if (editing) {
         const u = await updateProductionOutput(editing.id, payload)
@@ -203,9 +287,7 @@ export default function OutputPage() {
     } catch (err) {
       if (err instanceof ApiError) setFormError(err.detail)
       else toast.error('Gagal menyimpan data')
-    } finally {
-      setIsSaving(false)
-    }
+    } finally { setIsSaving(false) }
   }
 
   async function handleDelete() {
@@ -215,14 +297,10 @@ export default function OutputPage() {
       await deleteProductionOutput(deleteId)
       setRows(prev => prev.filter(r => r.id !== deleteId))
       toast.success('Data berhasil dihapus')
-    } catch {
-      toast.error('Gagal menghapus data')
-    } finally {
-      setIsDeleting(false); setDeleteId(null)
-    }
+    } catch { toast.error('Gagal menghapus data') }
+    finally { setIsDeleting(false); setDeleteId(null) }
   }
 
-  // ── Filtered + summary ────────────────────────────────────────────────────
   const filtered = rows.filter(r => {
     if (filterDate  && !r.date.startsWith(filterDate)) return false
     if (filterLine  !== 'all' && r.line_id  !== Number(filterLine))  return false
@@ -237,12 +315,9 @@ export default function OutputPage() {
   const totalRej = filtered.reduce((s, r) => s + r.reject_product, 0)
   const totalAct = filtered.reduce((s, r) => s + r.actual_output, 0)
 
-  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <OeeGuard section="input">
       <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50/30">
-
-        {/* Header */}
         <div className="relative overflow-hidden bg-gradient-to-r from-emerald-700 to-green-600 px-8 py-10">
           <div className="absolute -top-8 -right-8 h-40 w-40 rounded-full bg-white/5" />
           <div className="relative flex items-center gap-4">
@@ -258,24 +333,16 @@ export default function OutputPage() {
         </div>
 
         <div className="p-8 space-y-6">
-
-          {/* Toolbar */}
           <div className="flex justify-between items-center">
             <div>
               <h1 className="text-2xl font-bold text-emerald-900">Production Output</h1>
-              <p className="text-sm text-emerald-600 mt-0.5">
-                Kode pakan dipilih bebas dari master kode pakan
-              </p>
+              <p className="text-sm text-emerald-600 mt-0.5">Klik baris untuk melihat detail lengkap</p>
             </div>
-            <Button
-              className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-sm"
-              onClick={openAdd}
-            >
+            <Button className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-sm" onClick={openAdd}>
               <Plus className="h-4 w-4 mr-2" /> Tambah Output
             </Button>
           </div>
 
-          {/* Filters */}
           <Card>
             <CardContent className="p-4 grid grid-cols-1 sm:grid-cols-4 gap-3">
               <div className="space-y-1">
@@ -311,15 +378,14 @@ export default function OutputPage() {
             </CardContent>
           </Card>
 
-          {/* KPI Summary */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             {[
-              { label: 'Total Output',  value: fmt(totalAct), icon: Package,      color: 'text-emerald-600', bg: 'bg-emerald-50' },
+              { label: 'Total Output',   value: fmt(totalAct), icon: Package,      color: 'text-emerald-600', bg: 'bg-emerald-50' },
               { label: 'Finished Goods', value: fmt(totalFG),  icon: CheckCircle2, color: 'text-teal-600',    bg: 'bg-teal-50'    },
-              { label: 'Downgraded',    value: fmt(totalDG),  icon: TrendingUp,   color: 'text-blue-600',    bg: 'bg-blue-50'    },
-              { label: 'WIP',           value: fmt(totalWIP), icon: RotateCcw,    color: 'text-yellow-600',  bg: 'bg-yellow-50'  },
-              { label: 'Remix',         value: fmt(totalRmx), icon: Star,         color: 'text-orange-600',  bg: 'bg-orange-50'  },
-              { label: 'Reject',        value: fmt(totalRej), icon: XCircle,      color: 'text-red-500',     bg: 'bg-red-50'     },
+              { label: 'Downgraded',     value: fmt(totalDG),  icon: TrendingUp,   color: 'text-blue-600',    bg: 'bg-blue-50'    },
+              { label: 'WIP',            value: fmt(totalWIP), icon: RotateCcw,    color: 'text-yellow-600',  bg: 'bg-yellow-50'  },
+              { label: 'Remix',          value: fmt(totalRmx), icon: Star,         color: 'text-orange-600',  bg: 'bg-orange-50'  },
+              { label: 'Reject',         value: fmt(totalRej), icon: XCircle,      color: 'text-red-500',     bg: 'bg-red-50'     },
             ].map(k => (
               <Card key={k.label} className="border-0 shadow-sm">
                 <CardContent className="p-3 flex items-center gap-2">
@@ -335,23 +401,18 @@ export default function OutputPage() {
             ))}
           </div>
 
-          {/* Table */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 Riwayat Production Output
                 {!isLoading && (
-                  <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">
-                    {filtered.length} record
-                  </Badge>
+                  <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">{filtered.length} record</Badge>
                 )}
               </CardTitle>
             </CardHeader>
             <CardContent>
               {isLoading ? (
-                <div className="flex justify-center py-16">
-                  <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
-                </div>
+                <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-emerald-600" /></div>
               ) : (
                 <div className="overflow-x-auto">
                   <Table>
@@ -367,7 +428,7 @@ export default function OutputPage() {
                         <TableHead className="text-right">Remix (kg)</TableHead>
                         <TableHead className="text-right">Reject (kg)</TableHead>
                         <TableHead className="text-right">Total (kg)</TableHead>
-                        <TableHead className="text-center w-20" />
+                        <TableHead className="text-center w-28" />
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -378,12 +439,11 @@ export default function OutputPage() {
                           </TableCell>
                         </TableRow>
                       ) : filtered.map(r => (
-                        <TableRow key={r.id}>
+                        <TableRow key={r.id} className="cursor-pointer hover:bg-emerald-50/40"
+                          onClick={() => setViewRow(r)}>
                           <TableCell className="text-sm font-medium whitespace-nowrap">{fmtDate(r.date)}</TableCell>
                           <TableCell className="text-sm">{r.line_name ?? '-'}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="text-xs">{r.shift_name ?? '-'}</Badge>
-                          </TableCell>
+                          <TableCell><Badge variant="outline" className="text-xs">{r.shift_name ?? '-'}</Badge></TableCell>
                           <TableCell>
                             {r.feed_code_code
                               ? <Badge className="bg-blue-100 text-blue-700 border border-blue-200 hover:bg-blue-100 text-xs font-mono">{r.feed_code_code}</Badge>
@@ -395,16 +455,13 @@ export default function OutputPage() {
                           <TableCell className="text-right text-sm text-orange-600">{fmt(r.remix)}</TableCell>
                           <TableCell className="text-right text-sm text-red-600">{fmt(r.reject_product)}</TableCell>
                           <TableCell className="text-right text-sm font-semibold text-emerald-700">{fmt(r.actual_output)}</TableCell>
-                          <TableCell>
+                          <TableCell onClick={e => e.stopPropagation()}>
                             <div className="flex justify-center gap-1">
-                              <Button size="sm" variant="ghost" onClick={() => openEdit(r)}>
-                                <Pencil className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button size="sm" variant="ghost"
-                                className="text-destructive hover:text-destructive"
-                                onClick={() => setDeleteId(r.id)}>
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
+                              <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-emerald-600"
+                                onClick={() => setViewRow(r)}><Eye className="h-3.5 w-3.5" /></Button>
+                              <Button size="sm" variant="ghost" onClick={() => openEdit(r)}><Pencil className="h-3.5 w-3.5" /></Button>
+                              <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
+                                onClick={() => setDeleteId(r.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -418,7 +475,9 @@ export default function OutputPage() {
         </div>
       </div>
 
-      {/* ── Entry Dialog ──────────────────────────────────────────────────────── */}
+      <OutputDetailDialog row={viewRow} onClose={() => setViewRow(null)}
+        onEdit={row => { setViewRow(null); openEdit(row) }} />
+
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-[620px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -427,10 +486,7 @@ export default function OutputPage() {
               {editing ? 'Edit Production Output' : 'Tambah Production Output'}
             </DialogTitle>
           </DialogHeader>
-
           <div className="space-y-5 py-2">
-
-            {/* ── Row 1: Date + Shift ── */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>Tanggal <span className="text-destructive">*</span></Label>
@@ -443,39 +499,29 @@ export default function OutputPage() {
                   <SelectContent>
                     {shifts.map(s => (
                       <SelectItem key={s.id} value={String(s.id)}>
-                        {s.name}
-                        <span className="ml-2 text-xs text-muted-foreground">{s.time_from} – {s.time_to}</span>
+                        {s.name}<span className="ml-2 text-xs text-muted-foreground">{s.time_from} – {s.time_to}</span>
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
             </div>
-
-            {/* ── Row 2: Line + Feed Code ── */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>Line <span className="text-destructive">*</span></Label>
                 <Select value={form.line_id} onValueChange={v => setField('line_id', v)}>
                   <SelectTrigger><SelectValue placeholder="Pilih line…" /></SelectTrigger>
                   <SelectContent>
-                    {lines.map(l => (
-                      <SelectItem key={l.id} value={String(l.id)}>{l.name}{l.code ? ` (${l.code})` : ''}</SelectItem>
-                    ))}
+                    {lines.map(l => <SelectItem key={l.id} value={String(l.id)}>{l.name}{l.code ? ` (${l.code})` : ''}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>
-                  Kode Pakan
-                  <span className="ml-1 text-xs text-muted-foreground font-normal">dari master</span>
-                </Label>
+                <Label>Kode Pakan </Label>
                 <Select value={form.feed_code_id || 'none'} onValueChange={v => setField('feed_code_id', v === 'none' ? '' : v)}>
                   <SelectTrigger><SelectValue placeholder="Pilih kode pakan…" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">
-                      <span className="text-muted-foreground italic">— Tidak ada —</span>
-                    </SelectItem>
+                    <SelectItem value="none"><span className="text-muted-foreground italic">— Tidak ada —</span></SelectItem>
                     {feedCodes.map(fc => (
                       <SelectItem key={fc.id} value={String(fc.id)}>
                         <span className="font-mono font-medium">{fc.code}</span>
@@ -486,147 +532,62 @@ export default function OutputPage() {
                 </Select>
               </div>
             </div>
-
-            {/* ── 5 Output Fields ── */}
             <div className="rounded-xl border border-emerald-100 bg-emerald-50/40 p-4 space-y-3">
-              <p className="text-xs font-semibold text-emerald-700 uppercase tracking-widest">
-                Output Produksi (kg)
-              </p>
+              <p className="text-xs font-semibold text-emerald-700 uppercase tracking-widest">Output Produksi (kg)</p>
               <div className="grid grid-cols-2 gap-4">
-
-                {/* Finished Goods */}
-                <div className="space-y-1.5">
-                  <Label className="flex items-center gap-1.5">
-                    <span className="h-2 w-2 rounded-full bg-teal-500" />
-                    Finished Goods
-                  </Label>
-                  <Input
-                    type="number" min={0} placeholder="0"
-                    value={form.finished_goods}
-                    onChange={e => setField('finished_goods', e.target.value)}
-                  />
-                </div>
-
-                {/* Downgraded */}
-                <div className="space-y-1.5">
-                  <Label className="flex items-center gap-1.5">
-                    <span className="h-2 w-2 rounded-full bg-blue-500" />
-                    Downgraded Product
-                  </Label>
-                  <Input
-                    type="number" min={0} placeholder="0"
-                    value={form.downgraded_product}
-                    onChange={e => setField('downgraded_product', e.target.value)}
-                  />
-                </div>
-
-                {/* WIP */}
-                <div className="space-y-1.5">
-                  <Label className="flex items-center gap-1.5">
-                    <span className="h-2 w-2 rounded-full bg-yellow-500" />
-                    WIP
-                  </Label>
-                  <Input
-                    type="number" min={0} placeholder="0"
-                    value={form.wip}
-                    onChange={e => setField('wip', e.target.value)}
-                  />
-                </div>
-
-                {/* Remix */}
-                <div className="space-y-1.5">
-                  <Label className="flex items-center gap-1.5">
-                    <span className="h-2 w-2 rounded-full bg-orange-500" />
-                    Remix
-                  </Label>
-                  <Input
-                    type="number" min={0} placeholder="0"
-                    value={form.remix}
-                    onChange={e => setField('remix', e.target.value)}
-                  />
-                </div>
-
-                {/* Reject */}
+                {([
+                  { key: 'finished_goods',     label: 'Finished Goods',     dot: 'bg-teal-500'   },
+                  { key: 'downgraded_product', label: 'Downgraded Product', dot: 'bg-blue-500'   },
+                  { key: 'wip',                label: 'WIP',                dot: 'bg-yellow-400' },
+                  { key: 'remix',              label: 'Remix',              dot: 'bg-orange-400' },
+                ] as const).map(f => (
+                  <div key={f.key} className="space-y-1.5">
+                    <Label className="flex items-center gap-1.5">
+                      <span className={cn('h-2 w-2 rounded-full', f.dot)} />{f.label}
+                    </Label>
+                    <Input type="number" min={0} placeholder="0"
+                      value={(form as any)[f.key]}
+                      onChange={e => setField(f.key as keyof FormState, e.target.value)} />
+                  </div>
+                ))}
                 <div className="space-y-1.5 col-span-2">
                   <Label className="flex items-center gap-1.5">
-                    <span className="h-2 w-2 rounded-full bg-red-500" />
-                    Reject
+                    <span className="h-2 w-2 rounded-full bg-red-500" />Reject
                   </Label>
-                  <Input
-                    type="number" min={0} placeholder="0"
-                    value={form.reject_product}
-                    onChange={e => setField('reject_product', e.target.value)}
-                  />
+                  <Input type="number" min={0} placeholder="0" value={form.reject_product}
+                    onChange={e => setField('reject_product', e.target.value)} />
                 </div>
               </div>
             </div>
-
-            {/* ── Live Quality Gimmick ── */}
             {liveActual > 0 && (
               <div className="rounded-xl border bg-gradient-to-r from-violet-50 to-indigo-50 border-violet-200 p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs font-semibold text-violet-600 uppercase tracking-widest">
-                      Estimasi Quality Rate
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      FG ÷ Total Output × 100 — hanya tampilan
-                    </p>
+                    <p className="text-xs font-semibold text-violet-600 uppercase tracking-widest">Estimasi Quality Rate</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">FG ÷ Total Output × 100 — hanya tampilan</p>
                   </div>
                   <div className="text-right">
-                    <p className={cn('text-3xl font-black tabular-nums', qualityColor(liveQuality))}>
-                      {liveQuality.toFixed(1)}%
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {fmt(n(form.finished_goods))} / {fmt(liveActual)} kg
-                    </p>
+                    <p className={cn('text-3xl font-black tabular-nums', qualityColor(liveQuality))}>{liveQuality.toFixed(1)}%</p>
+                    <p className="text-xs text-muted-foreground">{fmt(n(form.finished_goods))} / {fmt(liveActual)} kg</p>
                   </div>
                 </div>
-                {/* Progress bar */}
                 <div className="h-3 w-full bg-white rounded-full overflow-hidden border border-violet-100">
-                  <div
-                    className={cn('h-full rounded-full transition-all duration-500', qualityBg(liveQuality))}
-                    style={{ width: `${Math.min(liveQuality, 100)}%` }}
-                  />
-                </div>
-                {/* Breakdown chips */}
-                <div className="flex flex-wrap gap-2 pt-1">
-                  {[
-                    { label: 'FG',  val: n(form.finished_goods),     color: 'bg-teal-100 text-teal-700'    },
-                    { label: 'DG',  val: n(form.downgraded_product),  color: 'bg-blue-100 text-blue-700'    },
-                    { label: 'WIP', val: n(form.wip),                 color: 'bg-yellow-100 text-yellow-700'},
-                    { label: 'Rmx', val: n(form.remix),               color: 'bg-orange-100 text-orange-700'},
-                    { label: 'Rej', val: n(form.reject_product),      color: 'bg-red-100 text-red-700'      },
-                  ].filter(x => x.val > 0).map(x => (
-                    <span key={x.label} className={cn('text-xs px-2 py-0.5 rounded-full font-medium', x.color)}>
-                      {x.label}: {fmt(x.val)} kg
-                      <span className="ml-1 opacity-60">
-                        ({liveActual > 0 ? ((x.val / liveActual) * 100).toFixed(1) : 0}%)
-                      </span>
-                    </span>
-                  ))}
+                  <div className={cn('h-full rounded-full transition-all duration-500', qualityBg(liveQuality))}
+                    style={{ width: `${Math.min(liveQuality, 100)}%` }} />
                 </div>
               </div>
             )}
-
-            {/* Remarks */}
             <div className="space-y-1.5">
               <Label>Remarks</Label>
-              <Textarea
-                placeholder="Keterangan opsional"
-                rows={2}
-                value={form.remarks}
-                onChange={e => setField('remarks', e.target.value)}
-              />
+              <Textarea placeholder="Keterangan opsional" rows={2} value={form.remarks}
+                onChange={e => setField('remarks', e.target.value)} />
             </div>
           </div>
-
           {formError && (
             <div className="flex items-center gap-2 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive -mt-1">
               <AlertCircle className="h-4 w-4 shrink-0" />{formError}
             </div>
           )}
-
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={isSaving}>Batal</Button>
             <Button onClick={handleSave} disabled={isSaving} className="bg-emerald-600 hover:bg-emerald-700">
@@ -637,15 +598,10 @@ export default function OutputPage() {
         </DialogContent>
       </Dialog>
 
-      <ConfirmDialog
-        open={!!deleteId}
-        onClose={() => setDeleteId(null)}
-        onConfirm={handleDelete}
+      <ConfirmDialog open={!!deleteId} onClose={() => setDeleteId(null)} onConfirm={handleDelete}
         title="Hapus Data Output"
         description="Data production output ini akan dihapus secara permanen. Lanjutkan?"
-        confirmText="Hapus"
-        isLoading={isDeleting}
-      />
+        confirmText="Hapus" isLoading={isDeleting} />
     </OeeGuard>
   )
 }

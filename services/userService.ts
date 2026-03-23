@@ -21,7 +21,6 @@ export const createUser = (data: {
   username: string
   email: string
   full_name: string
-  password: string
   role_id: number
   plant_ids: number[]
 }) => api.post<ApiUser>('/api/v1/users/', data, { withPlant: false })
@@ -36,6 +35,11 @@ export const updateUser = (id: number, data: Partial<{
 
 export const deactivateUser = (id: number) =>
   api.delete(`/api/v1/users/${id}`, { withPlant: false })
+
+export const resetPassword = (id: number) =>
+  api.post<{ message: string; temp_password: string }>(
+    `/api/v1/users/${id}/reset-password`, {}, { withPlant: false }
+  )
 
 // ─── Roles ────────────────────────────────────────────────────────────────────
 

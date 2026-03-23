@@ -19,6 +19,7 @@ export interface User {
   role_id: number;
   is_superuser: boolean;
   is_active: boolean;
+  must_change_password: boolean;
   created_at: string;
 }
 
@@ -39,6 +40,7 @@ interface AuthContextType {
   login: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   selectPlant: (plant: Plant) => void;
+  updateUser: (patch: Partial<User>) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -83,6 +85,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       role_id: data.user.role?.id ?? 0,
       is_superuser: data.user.is_superuser,
       is_active: data.user.is_active ?? true,
+      must_change_password: data.user.must_change_password ?? false,
       created_at: data.user.created_at ?? new Date().toISOString(),
     };
 
@@ -148,8 +151,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [clearSession]);
 
+  const updateUser = useCallback((patch: Partial<User>) => {
+    setUser(prev => {
+      if (!prev) return prev;
+      const updated = { ...prev, ...patch };
+      localStorage.setItem('user', JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, token, activePlant, accessiblePlants, isLoading, login, logout, selectPlant }}>
+    <AuthContext.Provider value={{ user, token, activePlant, accessiblePlants, isLoading, login, logout, selectPlant, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

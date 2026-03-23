@@ -3,7 +3,7 @@ export interface ApiRole { id: number; name: string }
 export interface ApiUser {
   id: number; username: string; email: string;
   full_name: string; role: ApiRole; is_active: boolean;
-  is_superuser: boolean; created_at: string;
+  is_superuser: boolean; must_change_password: boolean; created_at: string;
   plant_ids: number[];
 }
 

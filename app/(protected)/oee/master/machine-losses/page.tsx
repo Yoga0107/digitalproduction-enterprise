@@ -215,7 +215,7 @@ export default function MachineLossPage() {
             <div>
               <p className="text-white/60 text-xs font-semibold uppercase tracking-widest mb-1">Master Data</p>
               <h2 className="text-3xl font-bold text-white tracking-tight">Machine Losses</h2>
-              <p className="text-white/70 text-sm mt-1">Kategori kerugian mesin</p>
+              <p className="text-white/70 text-sm mt-1">Machine Losses</p>
             </div>
           </div>
         </div>

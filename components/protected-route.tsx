@@ -45,6 +45,12 @@ export function ProtectedRoute({
       return;
     }
 
+    // Force password change — redirect to dedicated page before anything else
+    if (user.must_change_password && pathname !== '/change-password') {
+      router.replace('/change-password');
+      return;
+    }
+
 
     if (allowedRoles && !allowedRoles.includes(user.role)) {
       router.replace('/unauthorized');
@@ -73,6 +79,8 @@ export function ProtectedRoute({
 
   if (!authPage && !user) return null;
 
+  // Allow /change-password page to render even if must_change_password is set
+  if (!authPage && user?.must_change_password && pathname !== '/change-password') return null;
 
   if (allowedRoles && user && !allowedRoles.includes(user.role)) return null;
 

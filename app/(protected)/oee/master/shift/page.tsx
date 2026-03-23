@@ -19,8 +19,7 @@ import { ApiError } from '@/lib/api-client'
 // ─── Shift 1–10 preset names (hardcode) ──────────────────────────────────
 // Hanya nama yang di-hardcode. Waktu tetap diisi manual.
 const SHIFT_NAMES = [
-  'Shift 1', 'Shift 2', 'Shift 3', 'Shift 4', 'Shift 5',
-  'Shift 6', 'Shift 7', 'Shift 8', 'Shift 9', 'Shift 10',
+  'Shift 1', 'Shift 2', 'Shift 3', 'Shift 4'
 ]
 
 type ShiftRow = { id: number; name: string; from: string; to: string; remarks: string }
