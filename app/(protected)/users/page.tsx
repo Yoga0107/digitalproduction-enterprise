@@ -8,8 +8,8 @@ import { ConfirmDialog } from '@/components/confirm-dialog'
 import { Users, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { ApiError } from '@/lib/api-client'
-import { ApiUser, ApiPlant, ApiRole } from '@/types/api'
-
+import { ApiUser, ApiPlant } from '@/types/api'
+import { ApiRole } from '@/services/userService'
 
 import { UserTable }       from '@/components/users/user-table'
 import { UserFormDialog, UserFormState, EMPTY_USER_FORM } from '@/components/users/user-form-dialog'
