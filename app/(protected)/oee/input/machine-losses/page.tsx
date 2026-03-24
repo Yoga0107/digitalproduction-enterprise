@@ -6,10 +6,12 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { ConfirmDialog } from '@/components/confirm-dialog'
+import { ExportImportBar } from '@/components/oee/export-import-bar'
 import { Wrench, Plus, Calendar, Factory, Clock, Tag, FileText, ChevronRight, Pencil, Eye } from 'lucide-react'
 import { toast } from 'sonner'
 import { ApiError } from '@/lib/api-client'
 import { cn } from '@/lib/utils'
+import { useAuth } from '@/lib/auth-context'
 
 import { MachineLossFilterBar }    from '@/components/oee/machine-loss-filter-bar'
 import { MachineLossKpiCards }     from '@/components/oee/machine-loss-kpi-cards'
@@ -23,6 +25,7 @@ import {
 import {
   getMachineLossInputs, createMachineLossInput,
   updateMachineLossInput, deleteMachineLossInput,
+  downloadMachineLossExcel, importMachineLossExcel,
 } from '@/services/inputService'
 import { getLines, getShifts, getMachineLosses, getFeedCodes } from '@/services/masterService'
 import { ApiMachineLossInput, ApiLine, ApiShift, ApiMachineLoss, ApiFeedCode } from '@/types/api'
@@ -49,8 +52,6 @@ function MachineLossDetailDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-1">
-
-          {/* Konteks */}
           <div className="grid grid-cols-2 gap-2.5">
             {[
               { icon: Calendar, label: 'Tanggal', value: fmtDate(row.date) },
@@ -67,15 +68,11 @@ function MachineLossDetailDialog({
             ))}
           </div>
 
-          {/* Kategori Kerugian */}
           <div className="rounded-xl border overflow-hidden">
             <div className="bg-slate-50 px-4 py-2.5 border-b">
-              <span className="text-xs font-semibold text-slate-600 uppercase tracking-widest">
-                Machine Losses
-              </span>
+              <span className="text-xs font-semibold text-slate-600 uppercase tracking-widest">Machine Losses</span>
             </div>
             <div className="p-4 space-y-3">
-              {/* L1 */}
               <div className="flex items-start gap-3">
                 <span className="px-2 py-0.5 rounded bg-red-100 text-red-700 text-[10px] font-bold shrink-0 mt-0.5">L1</span>
                 <div>
@@ -85,8 +82,6 @@ function MachineLossDetailDialog({
                     : <span className="text-sm text-muted-foreground">—</span>}
                 </div>
               </div>
-
-              {/* L2 */}
               {row.loss_l2_name && (
                 <div className="flex items-start gap-3 pl-4">
                   <ChevronRight className="h-3.5 w-3.5 text-slate-300 mt-1 shrink-0" />
@@ -97,8 +92,6 @@ function MachineLossDetailDialog({
                   </div>
                 </div>
               )}
-
-              {/* L3 */}
               {row.loss_l3_name && (
                 <div className="flex items-start gap-3 pl-8">
                   <ChevronRight className="h-3.5 w-3.5 text-slate-300 mt-1 shrink-0" />
@@ -112,7 +105,6 @@ function MachineLossDetailDialog({
             </div>
           </div>
 
-          {/* Waktu & Durasi */}
           <div className="rounded-xl border border-orange-100 bg-orange-50/40 overflow-hidden">
             <div className="bg-orange-50 px-4 py-2.5 border-b border-orange-100">
               <span className="text-xs font-semibold text-orange-700 uppercase tracking-widest">Waktu & Durasi</span>
@@ -133,7 +125,6 @@ function MachineLossDetailDialog({
             </div>
           </div>
 
-          {/* Remarks */}
           {row.remarks && (
             <div className="rounded-lg border bg-slate-50 px-4 py-3 space-y-1">
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -146,8 +137,7 @@ function MachineLossDetailDialog({
 
         <DialogFooter className="gap-2">
           <Button variant="outline" onClick={onClose}>Tutup</Button>
-          <Button className="bg-teal-600 hover:bg-teal-700"
-            onClick={() => { onClose(); onEdit(row) }}>
+          <Button className="bg-teal-600 hover:bg-teal-700" onClick={() => { onClose(); onEdit(row) }}>
             <Pencil className="h-4 w-4 mr-2" /> Edit
           </Button>
         </DialogFooter>
@@ -158,6 +148,8 @@ function MachineLossDetailDialog({
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function MachineLossInputPage() {
+  const { user } = useAuth()
+
   const [lines, setLines]         = useState<ApiLine[]>([])
   const [shifts, setShifts]       = useState<ApiShift[]>([])
   const [allLosses, setAllLosses] = useState<ApiMachineLoss[]>([])
@@ -165,6 +157,7 @@ export default function MachineLossInputPage() {
 
   const [rows, setRows]           = useState<ApiMachineLossInput[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isExporting, setIsExporting] = useState(false)
 
   const [filterDate,  setFilterDate]  = useState('')
   const [filterLine,  setFilterLine]  = useState('all')
@@ -260,6 +253,25 @@ export default function MachineLossInputPage() {
     finally { setIsDeleting(false); setDeleteId(null) }
   }
 
+  async function handleExport() {
+    setIsExporting(true)
+    try {
+      await downloadMachineLossExcel({
+        date_from: filterDate || undefined,
+        line_id:   filterLine  !== 'all' ? Number(filterLine)  : undefined,
+        shift_id:  filterShift !== 'all' ? Number(filterShift) : undefined,
+      })
+      toast.success('File Excel berhasil diunduh')
+    } catch { toast.error('Export gagal. Coba lagi.') }
+    finally { setIsExporting(false) }
+  }
+
+  async function handleImport(file: File) {
+    const result = await importMachineLossExcel(file)
+    if (result.imported > 0) await load()
+    return result
+  }
+
   const filtered = rows.filter(r => {
     if (filterDate  && !r.date.startsWith(filterDate))               return false
     if (filterLine  !== 'all' && r.line_id  !== Number(filterLine))  return false
@@ -276,6 +288,7 @@ export default function MachineLossInputPage() {
   return (
     <OeeGuard section="input">
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-teal-50/20">
+        {/* Hero header */}
         <div className="relative overflow-hidden bg-gradient-to-r from-teal-700 to-emerald-600 px-8 py-10">
           <div className="absolute -top-8 -right-8 h-40 w-40 rounded-full bg-white/5" />
           <div className="relative flex items-center gap-4">
@@ -291,14 +304,27 @@ export default function MachineLossInputPage() {
         </div>
 
         <div className="p-8 space-y-6">
-          <div className="flex justify-between items-center">
+          {/* Title row with Export/Import */}
+          <div className="flex flex-wrap justify-between items-center gap-3">
             <div>
               <h1 className="text-2xl font-bold text-slate-900">Machine Loss Input</h1>
               <p className="text-sm text-slate-500 mt-0.5">Klik baris untuk melihat detail lengkap</p>
             </div>
-            <Button className="bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 shadow-sm" onClick={openAdd}>
-              <Plus className="h-4 w-4 mr-2" /> Tambah Data
-            </Button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <ExportImportBar
+                role={user?.role ?? 'viewer'}
+                label="Machine Loss"
+                onExport={handleExport}
+                onImport={handleImport}
+                exportLoading={isExporting}
+              />
+              <Button
+                className="bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 shadow-sm"
+                onClick={openAdd}
+              >
+                <Plus className="h-4 w-4 mr-2" /> Tambah Data
+              </Button>
+            </div>
           </div>
 
           <MachineLossFilterBar
@@ -311,7 +337,6 @@ export default function MachineLossInputPage() {
           <MachineLossKpiCards totalEvents={filtered.length} totalHours={totalMinutes}
             avgHours={avgMinutes} topLossType={topL1} />
 
-          {/* Pass view handler to table */}
           <MachineLossHistoryTable rows={filtered} isLoading={isLoading}
             onEdit={openEdit} onDelete={setDeleteId} onView={setViewRow} />
         </div>

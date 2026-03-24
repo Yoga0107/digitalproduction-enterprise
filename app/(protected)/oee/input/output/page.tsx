@@ -18,9 +18,11 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import { ConfirmDialog } from '@/components/confirm-dialog'
+import { ExportImportBar } from '@/components/oee/export-import-bar'
 import {
   getProductionOutputs, createProductionOutput,
   updateProductionOutput, deleteProductionOutput,
+  downloadProductionOutputsExcel, importProductionOutputsExcel,
 } from '@/services/inputService'
 import { getLines, getShifts, getFeedCodes } from '@/services/masterService'
 import { ApiProductionOutput, ApiLine, ApiShift, ApiFeedCode } from '@/types/api'
@@ -32,6 +34,7 @@ import {
 } from 'lucide-react'
 import { ApiError } from '@/lib/api-client'
 import { cn } from '@/lib/utils'
+import { useAuth } from '@/lib/auth-context'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type FormState = {
@@ -98,14 +101,6 @@ function OutputDetailDialog({
   const quality = row.actual_output > 0
     ? parseFloat(((row.finished_goods / row.actual_output) * 100).toFixed(2)) : 0
 
-  const items = [
-    { label: 'Finished Goods',    value: row.finished_goods,    barColor: 'bg-teal-500',   text: 'text-teal-700',   bg: 'bg-teal-50'   },
-    { label: 'Downgraded',        value: row.downgraded_product, barColor: 'bg-blue-500',   text: 'text-blue-700',   bg: 'bg-blue-50'   },
-    { label: 'WIP',               value: row.wip,               barColor: 'bg-yellow-400', text: 'text-yellow-700', bg: 'bg-yellow-50' },
-    { label: 'Remix',             value: row.remix,             barColor: 'bg-orange-400', text: 'text-orange-700', bg: 'bg-orange-50' },
-    { label: 'Reject',            value: row.reject_product,    barColor: 'bg-red-500',    text: 'text-red-700',    bg: 'bg-red-50'    },
-  ]
-
   return (
     <Dialog open={!!row} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[540px] max-h-[92vh] overflow-y-auto">
@@ -115,14 +110,12 @@ function OutputDetailDialog({
             Detail Production Output
           </DialogTitle>
         </DialogHeader>
-
         <div className="space-y-4 py-1">
-          {/* Konteks */}
           <div className="grid grid-cols-2 gap-2.5">
             {[
-              { icon: Calendar, label: 'Tanggal',    value: fmtDate(row.date) },
-              { icon: Clock,    label: 'Shift',      value: row.shift_name ?? '—' },
-              { icon: Factory,  label: 'Line',       value: row.line_name ?? '—' },
+              { icon: Calendar, label: 'Tanggal', value: fmtDate(row.date) },
+              { icon: Clock,    label: 'Shift',   value: row.shift_name ?? '—' },
+              { icon: Factory,  label: 'Line',    value: row.line_name  ?? '—' },
               { icon: Tag,      label: 'Kode Pakan', value: row.feed_code_code ?? '—', mono: true },
             ].map(({ icon: Icon, label, value, mono }) => (
               <div key={label} className="rounded-lg border bg-slate-50 px-3 py-2.5 space-y-0.5">
@@ -133,71 +126,46 @@ function OutputDetailDialog({
               </div>
             ))}
           </div>
-
-          {/* Output breakdown */}
-          <div className="rounded-xl border border-emerald-100 overflow-hidden">
-            <div className="bg-emerald-50 px-4 py-2.5 flex items-center justify-between border-b border-emerald-100">
-              <span className="text-xs font-semibold text-emerald-700 uppercase tracking-widest">Breakdown Output</span>
-              <span className="text-sm font-bold text-emerald-800">Total: {fmt(row.actual_output)} kg</span>
+          <div className="rounded-xl border overflow-hidden">
+            <div className="bg-slate-50 px-4 py-2.5 border-b">
+              <span className="text-xs font-semibold text-slate-600 uppercase tracking-widest">Output (kg)</span>
             </div>
-            <div className="divide-y divide-slate-100">
-              {items.map(item => {
-                const pct = row.actual_output > 0 ? ((item.value / row.actual_output) * 100) : 0
-                return (
-                  <div key={item.label} className={cn('flex items-center gap-3 px-4 py-3', item.bg)}>
-                    <div className={cn('w-1.5 h-8 rounded-full shrink-0', item.barColor)} />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className={cn('text-xs font-semibold', item.text)}>{item.label}</span>
-                        <span className={cn('text-xs', item.text)}>{pct.toFixed(1)}%</span>
-                      </div>
-                      <div className="h-1.5 w-full bg-white/70 rounded-full overflow-hidden">
-                        <div className={cn('h-full rounded-full', item.barColor)} style={{ width: `${pct}%` }} />
-                      </div>
-                    </div>
-                    <span className={cn('text-sm font-bold tabular-nums w-24 text-right shrink-0', item.text)}>
-                      {fmt(item.value)} kg
-                    </span>
-                  </div>
-                )
-              })}
+            <div className="p-4 grid grid-cols-3 gap-3">
+              {[
+                { label: 'Finished Goods', value: row.finished_goods,     color: 'text-teal-700',   bg: 'bg-teal-50'   },
+                { label: 'Downgraded',     value: row.downgraded_product, color: 'text-blue-700',   bg: 'bg-blue-50'   },
+                { label: 'WIP',            value: row.wip,                color: 'text-yellow-700', bg: 'bg-yellow-50' },
+                { label: 'Remix',          value: row.remix,              color: 'text-orange-700', bg: 'bg-orange-50' },
+                { label: 'Reject',         value: row.reject_product,     color: 'text-red-700',    bg: 'bg-red-50'    },
+                { label: 'Total Actual',   value: row.actual_output,      color: 'text-emerald-700',bg: 'bg-emerald-50'},
+              ].map(({ label, value, color, bg }) => (
+                <div key={label} className={cn('rounded-lg px-3 py-2 space-y-0.5', bg)}>
+                  <p className="text-xs text-muted-foreground">{label}</p>
+                  <p className={cn('font-bold text-sm', color)}>{fmt(value)}</p>
+                </div>
+              ))}
             </div>
           </div>
-
-          {/* Quality Rate */}
-          <div className="rounded-xl border border-violet-100 bg-gradient-to-r from-violet-50 to-indigo-50 p-4 space-y-3">
+          <div className="rounded-xl border overflow-hidden bg-gradient-to-r from-violet-50 to-indigo-50 border-violet-200 p-4">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-semibold text-violet-700 uppercase tracking-widest">Quality Rate</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Finished Goods ÷ Total Output × 100</p>
-              </div>
-              <p className={cn('text-4xl font-black tabular-nums', qualityColor(quality))}>{quality.toFixed(1)}%</p>
+              <p className="text-xs font-semibold text-violet-700 uppercase tracking-widest">Quality Rate</p>
+              <p className={cn('text-2xl font-black', qualityColor(quality))}>{quality.toFixed(2)}%</p>
             </div>
-            <div className="h-3 w-full bg-white/70 rounded-full overflow-hidden border border-violet-100">
-              <div className={cn('h-full rounded-full transition-all', qualityBg(quality))}
-                style={{ width: `${Math.min(quality, 100)}%` }} />
-            </div>
-            <div className="flex justify-between text-xs text-muted-foreground">
-              <span>0%</span><span className="text-emerald-600 font-medium">Target ≥ 98%</span><span>100%</span>
+            <div className="mt-2 h-2.5 w-full bg-white rounded-full overflow-hidden border border-violet-100">
+              <div className={cn('h-full rounded-full', qualityBg(quality))} style={{ width: `${Math.min(quality,100)}%` }} />
             </div>
           </div>
-
-          {/* Remarks */}
           {row.remarks && (
-            <div className="rounded-lg border bg-slate-50 px-4 py-3 space-y-1">
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <FileText className="h-3 w-3" /> Keterangan
-              </div>
+            <div className="rounded-lg border bg-slate-50 px-3 py-2.5">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1"><FileText className="h-3 w-3" />Remarks</div>
               <p className="text-sm">{row.remarks}</p>
             </div>
           )}
         </div>
-
         <DialogFooter className="gap-2">
           <Button variant="outline" onClick={onClose}>Tutup</Button>
-          <Button className="bg-emerald-600 hover:bg-emerald-700"
-            onClick={() => { onClose(); onEdit(row) }}>
-            <Pencil className="h-4 w-4 mr-2" /> Edit
+          <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={() => onEdit(row)}>
+            <Pencil className="h-4 w-4 mr-2" />Edit
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -205,14 +173,17 @@ function OutputDetailDialog({
   )
 }
 
-// ─── Page ──────────────────────────────────────────────────────────────────────
+// ─── Main Page ────────────────────────────────────────────────────────────────
 export default function OutputPage() {
+  const { user } = useAuth()
+
   const [rows, setRows]           = useState<ApiProductionOutput[]>([])
   const [lines, setLines]         = useState<ApiLine[]>([])
   const [shifts, setShifts]       = useState<ApiShift[]>([])
   const [feedCodes, setFeedCodes] = useState<ApiFeedCode[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving]   = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing]       = useState<ApiProductionOutput | null>(null)
@@ -301,6 +272,25 @@ export default function OutputPage() {
     finally { setIsDeleting(false); setDeleteId(null) }
   }
 
+  async function handleExport() {
+    setIsExporting(true)
+    try {
+      await downloadProductionOutputsExcel({
+        date_from: filterDate || undefined,
+        line_id:   filterLine  !== 'all' ? Number(filterLine)  : undefined,
+        shift_id:  filterShift !== 'all' ? Number(filterShift) : undefined,
+      })
+      toast.success('File Excel berhasil diunduh')
+    } catch { toast.error('Export gagal. Coba lagi.') }
+    finally { setIsExporting(false) }
+  }
+
+  async function handleImport(file: File) {
+    const result = await importProductionOutputsExcel(file)
+    if (result.imported > 0) await load()
+    return result
+  }
+
   const filtered = rows.filter(r => {
     if (filterDate  && !r.date.startsWith(filterDate)) return false
     if (filterLine  !== 'all' && r.line_id  !== Number(filterLine))  return false
@@ -318,6 +308,7 @@ export default function OutputPage() {
   return (
     <OeeGuard section="input">
       <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50/30">
+        {/* Hero header */}
         <div className="relative overflow-hidden bg-gradient-to-r from-emerald-700 to-green-600 px-8 py-10">
           <div className="absolute -top-8 -right-8 h-40 w-40 rounded-full bg-white/5" />
           <div className="relative flex items-center gap-4">
@@ -333,16 +324,31 @@ export default function OutputPage() {
         </div>
 
         <div className="p-8 space-y-6">
-          <div className="flex justify-between items-center">
+          {/* Title row */}
+          <div className="flex flex-wrap justify-between items-center gap-3">
             <div>
               <h1 className="text-2xl font-bold text-emerald-900">Production Output</h1>
               <p className="text-sm text-emerald-600 mt-0.5">Klik baris untuk melihat detail lengkap</p>
             </div>
-            <Button className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-sm" onClick={openAdd}>
-              <Plus className="h-4 w-4 mr-2" /> Tambah Output
-            </Button>
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Export / Import bar */}
+              <ExportImportBar
+                role={user?.role ?? 'viewer'}
+                label="Production Output"
+                onExport={handleExport}
+                onImport={handleImport}
+                exportLoading={isExporting}
+              />
+              <Button
+                className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-sm"
+                onClick={openAdd}
+              >
+                <Plus className="h-4 w-4 mr-2" /> Tambah Output
+              </Button>
+            </div>
           </div>
 
+          {/* Filter card */}
           <Card>
             <CardContent className="p-4 grid grid-cols-1 sm:grid-cols-4 gap-3">
               <div className="space-y-1">
@@ -378,6 +384,7 @@ export default function OutputPage() {
             </CardContent>
           </Card>
 
+          {/* KPI cards */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             {[
               { label: 'Total Output',   value: fmt(totalAct), icon: Package,      color: 'text-emerald-600', bg: 'bg-emerald-50' },
@@ -401,6 +408,7 @@ export default function OutputPage() {
             ))}
           </div>
 
+          {/* Table card */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
@@ -478,6 +486,7 @@ export default function OutputPage() {
       <OutputDetailDialog row={viewRow} onClose={() => setViewRow(null)}
         onEdit={row => { setViewRow(null); openEdit(row) }} />
 
+      {/* Add / Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-[620px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -517,7 +526,7 @@ export default function OutputPage() {
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>Kode Pakan </Label>
+                <Label>Kode Pakan</Label>
                 <Select value={form.feed_code_id || 'none'} onValueChange={v => setField('feed_code_id', v === 'none' ? '' : v)}>
                   <SelectTrigger><SelectValue placeholder="Pilih kode pakan…" /></SelectTrigger>
                   <SelectContent>
