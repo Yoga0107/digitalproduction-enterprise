@@ -170,7 +170,7 @@ export function MachineLossEntryDialog({
     const adjustedShiftEnd = shiftEnd <= toMin(selectedShift.time_from) ? shiftEnd + 24 * 60 : shiftEnd
     if (adjustedEnd > adjustedShiftEnd) {
       const overMin = adjustedEnd - adjustedShiftEnd
-      return `Downtime melewati batas shift (${selectedShift.time_to}) sejauh ${fmtHours(overMin / 60)}. Data akan otomatis disimpan dalam ${Math.min(shifts.length, 2)} record terpisah.`
+      return `Downtime melewati batas shift (${selectedShift.time_to}) sejauh ${fmtHours(overMin)}. Data akan otomatis disimpan dalam ${Math.min(shifts.length, 2)} record terpisah.`
     }
     return null
   })()
@@ -445,7 +445,7 @@ export function MachineLossEntryDialog({
                 {displayHours > 0 && (
                   <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none">
                     <span className="text-xs font-bold text-orange-600 bg-orange-50 border border-orange-100 px-2 py-0.5 rounded">
-                      {fmtHours(displayHours)}
+                      {fmtHours(displayHours * 60)}
                     </span>
                   </div>
                 )}

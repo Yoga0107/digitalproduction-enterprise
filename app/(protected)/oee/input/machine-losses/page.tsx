@@ -214,7 +214,7 @@ function SplitShiftPreviewDialog({
                 </Badge>
               )}
               <Badge variant="outline" className="text-xs">
-                Total: {fmtHours(totalMin / 60)}
+                Total: {fmtHours(totalMin)}
               </Badge>
             </div>
             {l1 && (
@@ -250,7 +250,7 @@ function SplitShiftPreviewDialog({
                     'text-sm font-bold',
                     i === 0 ? 'text-blue-700' : 'text-indigo-700'
                   )}>
-                    {fmtHours(rec.duration_minutes / 60)}
+                    {fmtHours(rec.duration_minutes)}
                   </span>
                 </div>
                 <div className="flex items-center gap-3 text-xs text-slate-600">
@@ -269,7 +269,7 @@ function SplitShiftPreviewDialog({
           {/* Summary bar */}
           <div className="rounded-lg bg-slate-800 text-white px-4 py-2.5 flex items-center justify-between text-sm">
             <span className="text-slate-400 text-xs">Total downtime</span>
-            <span className="font-bold">{fmtHours(totalMin / 60)} ({totalMin} menit)</span>
+            <span className="font-bold">{fmtHours(totalMin)} ({totalMin} menit)</span>
           </div>
         </div>
 
@@ -589,7 +589,7 @@ export default function MachineLossInputPage() {
             <div>
               <p className="text-white/60 text-xs font-semibold uppercase tracking-widest mb-1">Input Data</p>
               <h2 className="text-3xl font-bold text-white tracking-tight">Machine Loss</h2>
-              <p className="text-white/70 text-sm mt-1">Input downtime harian per shift per line</p>
+              <p className="text-white/70 text-sm mt-1">Pencatatan downtime harian per shift &amp; line</p>
             </div>
           </div>
         </div>
@@ -599,7 +599,7 @@ export default function MachineLossInputPage() {
           <div className="flex flex-wrap justify-between items-center gap-3">
             <div>
               <h1 className="text-2xl font-bold text-slate-900">Machine Loss Input</h1>
-              <p className="text-sm text-slate-500 mt-0.5">Klik baris untuk melihat detail lengkap</p>
+              <p className="text-sm text-slate-500 mt-0.5">Riwayat downtime harian per shift per line</p>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               <ExportImportBar

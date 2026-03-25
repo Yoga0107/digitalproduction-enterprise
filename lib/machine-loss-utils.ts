@@ -13,16 +13,18 @@ export function calcDurationHours(from: string, to: string): number {
 }
 
 /**
- * Format hours into a readable string.
- * Examples: 0.5 → "30m"  |  1.5 → "1h 30m"  |  2.0 → "2h"
+ * Format minutes into decimal hours string.
+ * Examples: 90 min → "1.5 hr"  |  37 min → "0.617 hr"  |  60 min → "1 hr"  |  0 → "—"
+ * Input is always in MINUTES (as stored in DB as duration_minutes).
  */
-export function fmtHours(hours: number): string {
-  if (!hours || hours <= 0) return '—'
-  const h = Math.floor(hours)
-  const m = Math.round((hours - h) * 60)
-  if (h > 0 && m > 0) return `${h}h ${m}m`
-  if (h > 0)          return `${h}h`
-  return `${m}m`
+export function fmtHours(minutes: number): string {
+  if (!minutes || minutes <= 0) return '—'
+  const hrs = minutes / 60
+  // If exactly a whole number, show without decimals
+  if (Number.isInteger(hrs)) return `${hrs} hr`
+  // Round to 3 significant decimal places, strip trailing zeros
+  const rounded = parseFloat(hrs.toFixed(3))
+  return `${rounded} hr`
 }
 
 /** Format ISO date string to readable date. */
