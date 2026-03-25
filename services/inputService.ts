@@ -6,7 +6,7 @@
  */
 
 import { api, apiRequest } from '@/lib/api-client'
-import { ApiProductionOutput, ApiMachineLossInput } from '@/types/api'
+import { ApiProductionOutput, ApiProductionOutputItem, ApiMachineLossInput } from '@/types/api'
 import { API_BASE_URL } from '@/lib/api-config'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -105,6 +105,26 @@ export const updateProductionOutput = (
 
 export const deleteProductionOutput = (id: number) =>
   api.delete(`/api/v1/input/production-outputs/${id}`)
+
+/** Get production outputs broken down by type (finished_goods, downgraded_product, etc.) */
+export const getProductionOutputsByType = (params?: {
+  date_from?:   string
+  date_to?:     string
+  line_id?:     number
+  shift_id?:    number
+  output_type?: string
+}) => {
+  const q = new URLSearchParams()
+  if (params?.date_from)   q.set('date_from',   params.date_from)
+  if (params?.date_to)     q.set('date_to',     params.date_to)
+  if (params?.line_id)     q.set('line_id',     String(params.line_id))
+  if (params?.shift_id)    q.set('shift_id',    String(params.shift_id))
+  if (params?.output_type) q.set('output_type', params.output_type)
+  const qs = q.toString()
+  return api.get<ApiProductionOutputItem[]>(
+    `/api/v1/input/production-outputs/by-type${qs ? '?' + qs : ''}`
+  )
+}
 
 /** Export Production Outputs — roles: administrator, plant_manager, operator */
 export const downloadProductionOutputsExcel = (

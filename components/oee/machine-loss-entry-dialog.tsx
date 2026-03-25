@@ -132,8 +132,8 @@ export function MachineLossEntryDialog({
 
   // Step completion states
   const step1Done = !!(form.date && form.line_id && form.shift_id)
-  const step2Done = !!form.feed_code_id   // step 2 is always optional, just needs step 1 done to unlock
-  const step3Done = !!(form.loss_l1_id && form.loss_l2_id && form.loss_l3_id)   // step 3 is done when at least L1 and L2 are selected. L3 is optional and depends on L2.
+  const step2Done = step1Done   // step 2 is always optional, just needs step 1 done to unlock
+  const step3Done = !!form.loss_l1_id
   const step4Done = !!(form.duration_hours && Number(form.duration_hours) > 0)
 
   // Cascading loss options
@@ -292,7 +292,7 @@ export function MachineLossEntryDialog({
             label="Machine Loss Category"
             icon={Wrench}
             locked={!step2Done}
-            done={step3Done && !!step2Done}
+            done={step3Done}
           >
             {/* Breadcrumb preview */}
             {selL1 && (

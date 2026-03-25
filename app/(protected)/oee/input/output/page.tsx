@@ -20,12 +20,16 @@ import {
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { ExportImportBar } from '@/components/oee/export-import-bar'
 import {
+  Tabs, TabsContent, TabsList, TabsTrigger,
+} from '@/components/ui/tabs'
+import {
   getProductionOutputs, createProductionOutput,
   updateProductionOutput, deleteProductionOutput,
   downloadProductionOutputsExcel, importProductionOutputsExcel,
+  getProductionOutputsByType,
 } from '@/services/inputService'
 import { getLines, getShifts, getFeedCodes } from '@/services/masterService'
-import { ApiProductionOutput, ApiLine, ApiShift, ApiFeedCode } from '@/types/api'
+import { ApiProductionOutput, ApiProductionOutputItem, ApiLine, ApiShift, ApiFeedCode } from '@/types/api'
 import { toast } from 'sonner'
 import {
   Loader2, Plus, Pencil, Trash2, Activity, Eye,
@@ -87,6 +91,15 @@ function qualityBg(rate: number) {
   if (rate >= 98) return 'bg-emerald-500'
   if (rate >= 95) return 'bg-yellow-400'
   return 'bg-red-500'
+}
+
+// ─── Output type config ───────────────────────────────────────────────────────
+const OUTPUT_TYPE_CONFIG: Record<string, { label: string; color: string; bg: string; dot: string }> = {
+  finished_goods:     { label: 'Finished Goods',     color: 'text-teal-700',    bg: 'bg-teal-50',    dot: 'bg-teal-500'   },
+  downgraded_product: { label: 'Downgraded Product', color: 'text-blue-700',    bg: 'bg-blue-50',    dot: 'bg-blue-500'   },
+  wip:                { label: 'WIP',                color: 'text-yellow-700',  bg: 'bg-yellow-50',  dot: 'bg-yellow-400' },
+  remix:              { label: 'Remix',              color: 'text-orange-700',  bg: 'bg-orange-50',  dot: 'bg-orange-400' },
+  reject_product:     { label: 'Reject',             color: 'text-red-700',     bg: 'bg-red-50',     dot: 'bg-red-500'    },
 }
 
 // ─── View Detail Dialog ───────────────────────────────────────────────────────
@@ -194,8 +207,14 @@ export default function OutputPage() {
   const [filterDate, setFilterDate]   = useState('')
   const [filterLine, setFilterLine]   = useState('all')
   const [filterShift, setFilterShift] = useState('all')
+  const [filterType, setFilterType]   = useState('all')
+  const [activeTab, setActiveTab]     = useState<'summary' | 'bytype'>('summary')
+
   const [deleteId, setDeleteId]       = useState<number | null>(null)
   const [isDeleting, setIsDeleting]   = useState(false)
+
+  const [outputByType, setOutputByType]   = useState<ApiProductionOutputItem[]>([])
+  const [isLoadingByType, setIsLoadingByType] = useState(false)
 
   const { actual: liveActual, quality: liveQuality } = computeLive(form)
 
@@ -213,7 +232,21 @@ export default function OutputPage() {
     finally { setIsLoading(false) }
   }, [])
 
+  const loadByType = useCallback(async () => {
+    try {
+      setIsLoadingByType(true)
+      const data = await getProductionOutputsByType()
+      setOutputByType(data)
+    } catch { toast.error('Gagal memuat data per type') }
+    finally { setIsLoadingByType(false) }
+  }, [])
+
   useEffect(() => { load() }, [load])
+
+  function handleTabChange(tab: string) {
+    setActiveTab(tab as 'summary' | 'bytype')
+    if (tab === 'bytype' && outputByType.length === 0) loadByType()
+  }
 
   function setField(key: keyof FormState, value: string) { setForm(f => ({ ...f, [key]: value })) }
 
@@ -249,10 +282,14 @@ export default function OutputPage() {
         const u = await updateProductionOutput(editing.id, payload)
         setRows(prev => prev.map(r => r.id === editing.id ? u : r))
         toast.success('Data berhasil diperbarui')
+        setOutputByType(prev => prev.map(i => i.output_id === editing.id
+          ? { ...i, quantity: (payload as any)[i.output_type] ?? i.quantity } : i))
       } else {
         const c = await createProductionOutput(payload)
         setRows(prev => [c, ...prev])
         toast.success('Data berhasil disimpan')
+        // refresh by-type list to pick up new items
+        getProductionOutputsByType().then(setOutputByType).catch(() => {})
       }
       setDialogOpen(false)
     } catch (err) {
@@ -267,6 +304,7 @@ export default function OutputPage() {
     try {
       await deleteProductionOutput(deleteId)
       setRows(prev => prev.filter(r => r.id !== deleteId))
+      setOutputByType(prev => prev.filter(i => i.output_id !== deleteId))
       toast.success('Data berhasil dihapus')
     } catch { toast.error('Gagal menghapus data') }
     finally { setIsDeleting(false); setDeleteId(null) }
@@ -408,78 +446,198 @@ export default function OutputPage() {
             ))}
           </div>
 
-          {/* Table card */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                Riwayat Production Output
-                {!isLoading && (
-                  <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">{filtered.length} record</Badge>
-                )}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-emerald-600" /></div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Tanggal</TableHead>
-                        <TableHead>Line</TableHead>
-                        <TableHead>Shift</TableHead>
-                        <TableHead>Kode Pakan</TableHead>
-                        <TableHead className="text-right">FG (kg)</TableHead>
-                        <TableHead className="text-right">DG (kg)</TableHead>
-                        <TableHead className="text-right">WIP (kg)</TableHead>
-                        <TableHead className="text-right">Remix (kg)</TableHead>
-                        <TableHead className="text-right">Reject (kg)</TableHead>
-                        <TableHead className="text-right">Total (kg)</TableHead>
-                        <TableHead className="text-center w-28" />
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filtered.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={11} className="text-center py-12 text-muted-foreground">
-                            Belum ada data. Klik <strong>Tambah Output</strong> untuk mulai.
-                          </TableCell>
-                        </TableRow>
-                      ) : filtered.map(r => (
-                        <TableRow key={r.id} className="cursor-pointer hover:bg-emerald-50/40"
-                          onClick={() => setViewRow(r)}>
-                          <TableCell className="text-sm font-medium whitespace-nowrap">{fmtDate(r.date)}</TableCell>
-                          <TableCell className="text-sm">{r.line_name ?? '-'}</TableCell>
-                          <TableCell><Badge variant="outline" className="text-xs">{r.shift_name ?? '-'}</Badge></TableCell>
-                          <TableCell>
-                            {r.feed_code_code
-                              ? <Badge className="bg-blue-100 text-blue-700 border border-blue-200 hover:bg-blue-100 text-xs font-mono">{r.feed_code_code}</Badge>
-                              : <span className="text-muted-foreground text-xs">—</span>}
-                          </TableCell>
-                          <TableCell className="text-right text-sm font-medium text-teal-700">{fmt(r.finished_goods)}</TableCell>
-                          <TableCell className="text-right text-sm text-blue-600">{fmt(r.downgraded_product)}</TableCell>
-                          <TableCell className="text-right text-sm text-yellow-600">{fmt(r.wip)}</TableCell>
-                          <TableCell className="text-right text-sm text-orange-600">{fmt(r.remix)}</TableCell>
-                          <TableCell className="text-right text-sm text-red-600">{fmt(r.reject_product)}</TableCell>
-                          <TableCell className="text-right text-sm font-semibold text-emerald-700">{fmt(r.actual_output)}</TableCell>
-                          <TableCell onClick={e => e.stopPropagation()}>
-                            <div className="flex justify-center gap-1">
-                              <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-emerald-600"
-                                onClick={() => setViewRow(r)}><Eye className="h-3.5 w-3.5" /></Button>
-                              <Button size="sm" variant="ghost" onClick={() => openEdit(r)}><Pencil className="h-3.5 w-3.5" /></Button>
-                              <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
-                                onClick={() => setDeleteId(r.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          {/* Table + By-Type tabs */}
+          <Tabs defaultValue="summary" onValueChange={handleTabChange}>
+            <TabsList className="mb-2">
+              <TabsTrigger value="summary">Ringkasan</TabsTrigger>
+              <TabsTrigger value="bytype">Per Tipe Output</TabsTrigger>
+            </TabsList>
+
+            {/* ── Tab 1: Summary (existing table) ── */}
+            <TabsContent value="summary">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    Riwayat Production Output
+                    {!isLoading && (
+                      <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">{filtered.length} record</Badge>
+                    )}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {isLoading ? (
+                    <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-emerald-600" /></div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Tanggal</TableHead>
+                            <TableHead>Line</TableHead>
+                            <TableHead>Shift</TableHead>
+                            <TableHead>Kode Pakan</TableHead>
+                            <TableHead className="text-right">FG (kg)</TableHead>
+                            <TableHead className="text-right">DG (kg)</TableHead>
+                            <TableHead className="text-right">WIP (kg)</TableHead>
+                            <TableHead className="text-right">Remix (kg)</TableHead>
+                            <TableHead className="text-right">Reject (kg)</TableHead>
+                            <TableHead className="text-right">Total (kg)</TableHead>
+                            <TableHead className="text-center w-28" />
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filtered.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={11} className="text-center py-12 text-muted-foreground">
+                                Belum ada data. Klik <strong>Tambah Output</strong> untuk mulai.
+                              </TableCell>
+                            </TableRow>
+                          ) : filtered.map(r => (
+                            <TableRow key={r.id} className="cursor-pointer hover:bg-emerald-50/40"
+                              onClick={() => setViewRow(r)}>
+                              <TableCell className="text-sm font-medium whitespace-nowrap">{fmtDate(r.date)}</TableCell>
+                              <TableCell className="text-sm">{r.line_name ?? '-'}</TableCell>
+                              <TableCell><Badge variant="outline" className="text-xs">{r.shift_name ?? '-'}</Badge></TableCell>
+                              <TableCell>
+                                {r.feed_code_code
+                                  ? <Badge className="bg-blue-100 text-blue-700 border border-blue-200 hover:bg-blue-100 text-xs font-mono">{r.feed_code_code}</Badge>
+                                  : <span className="text-muted-foreground text-xs">—</span>}
+                              </TableCell>
+                              <TableCell className="text-right text-sm font-medium text-teal-700">{fmt(r.finished_goods)}</TableCell>
+                              <TableCell className="text-right text-sm text-blue-600">{fmt(r.downgraded_product)}</TableCell>
+                              <TableCell className="text-right text-sm text-yellow-600">{fmt(r.wip)}</TableCell>
+                              <TableCell className="text-right text-sm text-orange-600">{fmt(r.remix)}</TableCell>
+                              <TableCell className="text-right text-sm text-red-600">{fmt(r.reject_product)}</TableCell>
+                              <TableCell className="text-right text-sm font-semibold text-emerald-700">{fmt(r.actual_output)}</TableCell>
+                              <TableCell onClick={e => e.stopPropagation()}>
+                                <div className="flex justify-center gap-1">
+                                  <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-emerald-600"
+                                    onClick={() => setViewRow(r)}><Eye className="h-3.5 w-3.5" /></Button>
+                                  <Button size="sm" variant="ghost" onClick={() => openEdit(r)}><Pencil className="h-3.5 w-3.5" /></Button>
+                                  <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
+                                    onClick={() => setDeleteId(r.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* ── Tab 2: Per Tipe Output ── */}
+            <TabsContent value="bytype">
+              <Card>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between flex-wrap gap-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      Output per Tipe
+                      {!isLoadingByType && (
+                        <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
+                          {outputByType.filter(r =>
+                            (filterType === 'all' || r.output_type === filterType) &&
+                            (!filterDate  || r.date.startsWith(filterDate)) &&
+                            (filterLine  === 'all' || r.line_id  === Number(filterLine)) &&
+                            (filterShift === 'all' || r.shift_id === Number(filterShift))
+                          ).length} record
+                        </Badge>
+                      )}
+                    </CardTitle>
+                    {/* Type filter */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">Filter tipe:</span>
+                      <Select value={filterType} onValueChange={setFilterType}>
+                        <SelectTrigger className="w-[180px] h-8 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Semua Tipe</SelectItem>
+                          {Object.entries(OUTPUT_TYPE_CONFIG).map(([key, cfg]) => (
+                            <SelectItem key={key} value={key}>
+                              <span className="flex items-center gap-2">
+                                <span className={cn('h-2 w-2 rounded-full shrink-0', cfg.dot)} />
+                                {cfg.label}
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {isLoadingByType ? (
+                    <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-blue-600" /></div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Tanggal</TableHead>
+                            <TableHead>Line</TableHead>
+                            <TableHead>Shift</TableHead>
+                            <TableHead>Kode Pakan</TableHead>
+                            <TableHead>Tipe Output</TableHead>
+                            <TableHead className="text-right">Qty (kg)</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {(() => {
+                            const filtered2 = outputByType.filter(r =>
+                              (filterType  === 'all' || r.output_type === filterType) &&
+                              (!filterDate  || r.date.startsWith(filterDate)) &&
+                              (filterLine  === 'all' || r.line_id  === Number(filterLine)) &&
+                              (filterShift === 'all' || r.shift_id === Number(filterShift))
+                            )
+                            if (filtered2.length === 0) return (
+                              <TableRow>
+                                <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
+                                  {outputByType.length === 0
+                                    ? 'Klik tab ini untuk memuat data per tipe.'
+                                    : 'Tidak ada data sesuai filter.'}
+                                </TableCell>
+                              </TableRow>
+                            )
+                            return filtered2.map(r => {
+                              const cfg = OUTPUT_TYPE_CONFIG[r.output_type] ?? {
+                                label: r.output_type, color: 'text-slate-700', bg: 'bg-slate-50', dot: 'bg-slate-400'
+                              }
+                              return (
+                                <TableRow key={r.item_id} className="hover:bg-slate-50/60">
+                                  <TableCell className="text-sm font-medium whitespace-nowrap">{fmtDate(r.date)}</TableCell>
+                                  <TableCell className="text-sm">{r.line_name ?? '—'}</TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline" className="text-xs">{r.shift_name ?? '—'}</Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    {r.feed_code_code
+                                      ? <Badge className="bg-blue-100 text-blue-700 border border-blue-200 hover:bg-blue-100 text-xs font-mono">{r.feed_code_code}</Badge>
+                                      : <span className="text-muted-foreground text-xs">—</span>}
+                                  </TableCell>
+                                  <TableCell>
+                                    <span className={cn('inline-flex items-center gap-1.5 text-xs font-semibold px-2 py-1 rounded-full border', cfg.bg, cfg.color)}>
+                                      <span className={cn('h-2 w-2 rounded-full shrink-0', cfg.dot)} />
+                                      {cfg.label}
+                                    </span>
+                                  </TableCell>
+                                  <TableCell className={cn('text-right text-sm font-bold', cfg.color)}>
+                                    {fmt(r.quantity)}
+                                  </TableCell>
+                                </TableRow>
+                              )
+                            })
+                          })()}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
 

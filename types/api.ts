@@ -82,6 +82,21 @@ export interface ApiStandardThroughput {
   created_at: string; created_by_id: number | null;
 }
 
+export interface ApiProductionOutputItem {
+  item_id:         number
+  output_id:       number
+  date:            string
+  line_id:         number
+  line_name:       string | null
+  shift_id:        number
+  shift_name:      string | null
+  feed_code_id:    number | null
+  feed_code_code:  string | null
+  output_type:     'finished_goods' | 'downgraded_product' | 'wip' | 'remix' | 'reject_product'
+  quantity:        number
+  remarks:         string | null
+}
+
 export interface ApiProductionOutput {
   id: number
   date: string

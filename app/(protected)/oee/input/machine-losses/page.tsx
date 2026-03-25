@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { ExportImportBar } from '@/components/oee/export-import-bar'
-import { Wrench, Plus, Calendar, Factory, Clock, Tag, FileText, ChevronRight, Pencil, Eye } from 'lucide-react'
+import { Wrench, Plus, Calendar, Factory, Clock, Tag, FileText, ChevronRight, Pencil, Eye, AlertTriangle, SplitSquareHorizontal, Check, ArrowRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { ApiError } from '@/lib/api-client'
 import { cn } from '@/lib/utils'
@@ -30,6 +30,16 @@ import {
 import { getLines, getShifts, getMachineLosses, getFeedCodes } from '@/services/masterService'
 import { ApiMachineLossInput, ApiLine, ApiShift, ApiMachineLoss, ApiFeedCode } from '@/types/api'
 import { fmtDate, fmtHours } from '@/lib/machine-loss-utils'
+
+// ─── Split record type ────────────────────────────────────────────────────────
+interface SplitRecord {
+  shift_id:         number
+  shift_name:       string
+  shift_time_range: string
+  time_from:        string | null
+  time_to:          string | null
+  duration_minutes: number
+}
 
 // ─── View Detail Dialog ───────────────────────────────────────────────────────
 function MachineLossDetailDialog({
@@ -146,6 +156,143 @@ function MachineLossDetailDialog({
   )
 }
 
+// ─── Split Shift Preview Dialog ───────────────────────────────────────────────
+function SplitShiftPreviewDialog({
+  open,
+  splits,
+  form,
+  shifts,
+  allLosses,
+  isSaving,
+  onConfirm,
+  onBack,
+}: {
+  open:      boolean
+  splits:    SplitRecord[]
+  form:      MachineLossFormState
+  shifts:    ApiShift[]
+  allLosses: ApiMachineLoss[]
+  isSaving:  boolean
+  onConfirm: () => void
+  onBack:    () => void
+}) {
+  if (!open) return null
+
+  const l1 = allLosses.find(l => String(l.id) === form.loss_l1_id)
+  const l2 = allLosses.find(l => String(l.id) === form.loss_l2_id)
+  const l3 = allLosses.find(l => String(l.id) === form.loss_l3_id)
+  const totalMin = splits.reduce((s, r) => s + r.duration_minutes, 0)
+
+  return (
+    <Dialog open={open} onOpenChange={onBack}>
+      <DialogContent className="sm:max-w-[540px] max-h-[92vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <SplitSquareHorizontal className="h-5 w-5 text-amber-600" />
+            Preview Split Downtime
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4 py-1">
+          {/* Alert info */}
+          <div className="flex items-start gap-2.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-3">
+            <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+            <div className="text-xs text-amber-800">
+              <p className="font-semibold mb-0.5">Downtime melewati batas shift</p>
+              <p>Sistem akan menyimpan <strong>{splits.length} record terpisah</strong> sesuai shift yang terlewati. Periksa data di bawah sebelum konfirmasi.</p>
+            </div>
+          </div>
+
+          {/* Context: what's being recorded */}
+          <div className="rounded-lg border bg-slate-50 px-4 py-3 space-y-2">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Data Downtime</p>
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="outline" className="text-xs font-mono">{form.date}</Badge>
+              {form.time_from && form.time_to && (
+                <Badge variant="outline" className="text-xs">
+                  <Clock className="h-3 w-3 mr-1" />{form.time_from} → {form.time_to}
+                </Badge>
+              )}
+              <Badge variant="outline" className="text-xs">
+                Total: {fmtHours(totalMin / 60)}
+              </Badge>
+            </div>
+            {l1 && (
+              <div className="flex items-center gap-1.5 text-xs flex-wrap mt-1">
+                <span className="px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-bold">L1</span>
+                <span className="font-medium">{l1.name}</span>
+                {l2 && <><ArrowRight className="h-3 w-3 text-slate-400" /><span className="px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 font-bold">L2</span><span className="font-medium">{l2.name}</span></>}
+                {l3 && <><ArrowRight className="h-3 w-3 text-slate-400" /><span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-bold">L3</span><span className="font-medium">{l3.name}</span></>}
+              </div>
+            )}
+          </div>
+
+          {/* Split records preview */}
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Record yang akan disimpan</p>
+            {splits.map((rec, i) => (
+              <div key={i} className={cn(
+                'rounded-xl border-2 px-4 py-3 space-y-2',
+                i === 0 ? 'border-blue-200 bg-blue-50/60' : 'border-indigo-200 bg-indigo-50/60'
+              )}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className={cn(
+                      'h-6 w-6 rounded-full flex items-center justify-center text-xs font-bold text-white',
+                      i === 0 ? 'bg-blue-500' : 'bg-indigo-500'
+                    )}>
+                      {i + 1}
+                    </div>
+                    <span className="font-semibold text-sm">{rec.shift_name}</span>
+                    <Badge variant="outline" className="text-[10px]">{rec.shift_time_range}</Badge>
+                  </div>
+                  <span className={cn(
+                    'text-sm font-bold',
+                    i === 0 ? 'text-blue-700' : 'text-indigo-700'
+                  )}>
+                    {fmtHours(rec.duration_minutes / 60)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 text-xs text-slate-600">
+                  {rec.time_from && rec.time_to && (
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {rec.time_from} – {rec.time_to}
+                    </span>
+                  )}
+                  <span className="text-slate-400">{rec.duration_minutes} menit</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Summary bar */}
+          <div className="rounded-lg bg-slate-800 text-white px-4 py-2.5 flex items-center justify-between text-sm">
+            <span className="text-slate-400 text-xs">Total downtime</span>
+            <span className="font-bold">{fmtHours(totalMin / 60)} ({totalMin} menit)</span>
+          </div>
+        </div>
+
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={onBack} disabled={isSaving}>
+            ← Kembali Edit
+          </Button>
+          <Button
+            onClick={onConfirm}
+            disabled={isSaving}
+            className="bg-amber-600 hover:bg-amber-700"
+          >
+            {isSaving
+              ? <><span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent inline-block" />Menyimpan…</>
+              : <><Check className="mr-2 h-4 w-4" />Konfirmasi & Simpan {splits.length} Record</>
+            }
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function MachineLossInputPage() {
   const { user } = useAuth()
@@ -172,6 +319,11 @@ export default function MachineLossInputPage() {
   const [viewRow, setViewRow]       = useState<ApiMachineLossInput | null>(null)
   const [deleteId, setDeleteId]     = useState<number | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+
+  // Split-shift preview
+  const [splitPreview, setSplitPreview]     = useState<SplitRecord[]>([])
+  const [splitPreviewOpen, setSplitPreviewOpen] = useState(false)
+  const [pendingForm, setPendingForm]       = useState<MachineLossFormState | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -215,150 +367,170 @@ export default function MachineLossInputPage() {
     const dur = Number(form.duration_hours)
     if (!form.duration_hours || dur <= 0) { setFormError('Durasi harus lebih dari 0.'); return }
 
-    setIsSaving(true)
-    try {
-      const basePayload = {
-        date: new Date(form.date).toISOString(), line_id: Number(form.line_id),
-        feed_code_id: form.feed_code_id ? Number(form.feed_code_id) : null,
-        loss_l1_id: form.loss_l1_id ? Number(form.loss_l1_id) : null,
-        loss_l2_id: form.loss_l2_id ? Number(form.loss_l2_id) : null,
-        loss_l3_id: form.loss_l3_id ? Number(form.loss_l3_id) : null,
-        remarks: form.remarks || undefined,
-      }
+    // Edit mode: langsung simpan tanpa split
+    if (editing) {
+      await commitSave(form, null)
+      return
+    }
 
+    // Create mode: cek apakah perlu split
+    const selectedShift = shifts.find(s => String(s.id) === form.shift_id) ?? null
+    const splits = buildSplitRecords(form, selectedShift, shifts)
+
+    if (splits.length > 1) {
+      // Tampilkan preview & konfirmasi dulu
+      setSplitPreview(splits)
+      setPendingForm(form)
+      setDialogOpen(false)
+      setSplitPreviewOpen(true)
+    } else {
+      // Tidak ada split — simpan langsung
+      await commitSave(form, null)
+    }
+  }
+
+  async function commitSave(f: MachineLossFormState, splits: SplitRecord[] | null) {
+    setIsSaving(true)
+    const dur = Number(f.duration_hours)
+    const basePayload = {
+      date: new Date(f.date).toISOString(),
+      line_id:      Number(f.line_id),
+      feed_code_id: f.feed_code_id ? Number(f.feed_code_id) : null,
+      loss_l1_id:   f.loss_l1_id   ? Number(f.loss_l1_id)   : null,
+      loss_l2_id:   f.loss_l2_id   ? Number(f.loss_l2_id)   : null,
+      loss_l3_id:   f.loss_l3_id   ? Number(f.loss_l3_id)   : null,
+      remarks:      f.remarks || undefined,
+    }
+    try {
       if (editing) {
-        // Edit mode: simpan langsung tanpa split
         const payload = {
           ...basePayload,
-          shift_id: Number(form.shift_id),
-          time_from: form.time_from || null,
-          time_to: form.time_to || null,
+          shift_id: Number(f.shift_id),
+          time_from: f.time_from || null,
+          time_to:   f.time_to   || null,
           duration_minutes: dur,
         }
         const u = await updateMachineLossInput(editing.id, payload)
         setRows(prev => prev.map(r => r.id === editing.id ? u : r))
         toast.success('Data berhasil diperbarui')
         setDialogOpen(false)
-        return
-      }
-
-      // ── Create mode: cek apakah downtime melewati shift boundary ──────────
-      const selectedShift = shifts.find(s => String(s.id) === form.shift_id)
-      const splitRecords = buildSplitRecords(
-        form.date,
-        form.time_from,
-        form.time_to,
-        dur,
-        Number(form.shift_id),
-        selectedShift ?? null,
-        shifts,
-      )
-
-      if (splitRecords.length > 1) {
-        // Simpan semua split record
+      } else if (splits && splits.length > 1) {
         const created = await Promise.all(
-          splitRecords.map(sr => createMachineLossInput({ ...basePayload, ...sr }))
+          splits.map(sr => createMachineLossInput({
+            ...basePayload,
+            shift_id:         sr.shift_id,
+            time_from:        sr.time_from,
+            time_to:          sr.time_to,
+            duration_minutes: sr.duration_minutes,
+          }))
         )
         setRows(prev => [...created.reverse(), ...prev])
-        toast.success(
-          `Data disimpan sebagai ${created.length} record (melewati ${created.length - 1} batas shift)`
-        )
+        toast.success(`${created.length} record berhasil disimpan (split antar shift)`)
+        setSplitPreviewOpen(false)
+        setPendingForm(null)
       } else {
-        // Normal: satu record
         const payload = {
           ...basePayload,
-          shift_id: Number(form.shift_id),
-          time_from: form.time_from || null,
-          time_to: form.time_to || null,
+          shift_id: Number(f.shift_id),
+          time_from: f.time_from || null,
+          time_to:   f.time_to   || null,
           duration_minutes: dur,
         }
         const c = await createMachineLossInput(payload)
         setRows(prev => [c, ...prev])
         toast.success('Data berhasil disimpan')
+        setDialogOpen(false)
       }
-      setDialogOpen(false)
     } catch (err) {
-      if (err instanceof ApiError) setFormError(err.detail)
-      else toast.error('Gagal menyimpan data')
+      if (err instanceof ApiError) {
+        setFormError(err.detail)
+        // Kalau dari preview, kembalikan ke form dialog
+        if (splits) {
+          setSplitPreviewOpen(false)
+          setDialogOpen(true)
+        }
+      } else {
+        toast.error('Gagal menyimpan data')
+      }
     } finally { setIsSaving(false) }
   }
 
+  /** Build split records. Returns 1 item if no split needed. */
   function buildSplitRecords(
-    date: string,
-    timeFrom: string,
-    timeTo: string,
-    durationHours: number,
-    shiftId: number,
+    f: MachineLossFormState,
     selectedShift: ApiShift | null,
     allShifts: ApiShift[],
-  ): Array<{ shift_id: number; time_from: string | null; time_to: string | null; duration_minutes: number }> {
-    // Jika tidak ada time_from/time_to, tidak bisa split — pakai satu record
+  ): SplitRecord[] {
+    const timeFrom = f.time_from
+    const timeTo   = f.time_to
+    const dur      = Number(f.duration_hours)
+
     if (!timeFrom || !timeTo || !selectedShift) {
-      return [{ shift_id: shiftId, time_from: timeFrom || null, time_to: timeTo || null, duration_minutes: durationHours }]
+      return [{
+        shift_id: Number(f.shift_id),
+        shift_name: selectedShift?.name ?? '',
+        shift_time_range: selectedShift ? `${selectedShift.time_from}–${selectedShift.time_to}` : '',
+        time_from: timeFrom || null,
+        time_to:   timeTo   || null,
+        duration_minutes: dur,
+      }]
     }
 
-    const toMinutes = (hhmm: string) => {
-      const [h, m] = hhmm.split(':').map(Number)
-      return h * 60 + m
-    }
-    const toHHMM = (minutes: number) => {
-      const h = Math.floor(minutes / 60) % 24
-      const m = minutes % 60
+    const toMin  = (hhmm: string) => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m }
+    const toHHMM = (min: number)  => {
+      const h = Math.floor(min / 60) % 24
+      const m = min % 60
       return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
     }
 
-    // Build sorted shift list by start time (handle overnight shifts)
-    const sortedShifts = [...allShifts].sort((a, b) => toMinutes(a.time_from) - toMinutes(b.time_from))
+    const sortedShifts = [...allShifts].sort((a, b) => toMin(a.time_from) - toMin(b.time_from))
 
-    let curFromMin = toMinutes(timeFrom)
-    const endMin   = toMinutes(timeTo)
+    let curFrom     = toMin(timeFrom)
+    const rawEnd    = toMin(timeTo)
+    const adjustEnd = rawEnd <= curFrom ? rawEnd + 24 * 60 : rawEnd
 
-    // Handle time_to < time_from (melewati tengah malam) — tambah 24 jam
-    const adjustedEnd = endMin <= curFromMin ? endMin + 24 * 60 : endMin
+    const records: SplitRecord[] = []
+    let curShiftId = Number(f.shift_id)
+    let safety     = 0
 
-    const records: Array<{ shift_id: number; time_from: string | null; time_to: string | null; duration_minutes: number }> = []
+    while (curFrom < adjustEnd && safety < 10) {
+      safety++
+      const curShift = allShifts.find(s => s.id === curShiftId)
+      if (!curShift) break
 
-    let currentShiftId = shiftId
-    let safetyLimit    = 0
-
-    while (curFromMin < adjustedEnd && safetyLimit < 10) {
-      safetyLimit++
-      const currentShift = allShifts.find(s => s.id === currentShiftId)
-      if (!currentShift) break
-
-      const shiftEndMin = toMinutes(currentShift.time_to)
-      // Normalise shift end: if shift end <= shift start, shift crosses midnight
-      const adjustedShiftEnd = shiftEndMin <= toMinutes(currentShift.time_from)
-        ? shiftEndMin + 24 * 60
-        : shiftEndMin
-
-      const sliceEnd = Math.min(adjustedEnd, adjustedShiftEnd)
-      const durationMin = sliceEnd - curFromMin
+      const shiftEnd = toMin(curShift.time_to)
+      const adjShiftEnd = shiftEnd <= toMin(curShift.time_from) ? shiftEnd + 24 * 60 : shiftEnd
+      const sliceEnd    = Math.min(adjustEnd, adjShiftEnd)
+      const durationMin = sliceEnd - curFrom
 
       records.push({
-        shift_id: currentShiftId,
-        time_from: toHHMM(curFromMin % (24 * 60)),
+        shift_id:         curShift.id,
+        shift_name:       curShift.name,
+        shift_time_range: `${curShift.time_from}–${curShift.time_to}`,
+        time_from: toHHMM(curFrom % (24 * 60)),
         time_to:   toHHMM(sliceEnd % (24 * 60)),
-        duration_minutes: Math.round(durationMin),  // backend expects minutes
+        duration_minutes: Math.round(durationMin),
       })
 
-      if (sliceEnd >= adjustedEnd) break
+      if (sliceEnd >= adjustEnd) break
 
-      // Find next shift
-      curFromMin = sliceEnd
-      const nextShift = sortedShifts.find(s => {
-        const sStart = toMinutes(s.time_from)
-        return sStart === sliceEnd % (24 * 60) || sStart === curFromMin % (24 * 60)
-      }) ?? sortedShifts.find(s => s.id !== currentShiftId)
-
-      if (!nextShift) break
-      currentShiftId = nextShift.id
+      curFrom = sliceEnd
+      const next = sortedShifts.find(s => {
+        const ss = toMin(s.time_from)
+        return ss === curFrom % (24 * 60)
+      }) ?? sortedShifts.find(s => s.id !== curShiftId)
+      if (!next) break
+      curShiftId = next.id
     }
 
-    // Fallback: jika gagal split, kembalikan satu record asli
-    return records.length > 0 ? records : [
-      { shift_id: shiftId, time_from: timeFrom, time_to: timeTo, duration_minutes: durationHours }
-    ]
+    return records.length > 0 ? records : [{
+      shift_id: Number(f.shift_id),
+      shift_name: selectedShift.name,
+      shift_time_range: `${selectedShift.time_from}–${selectedShift.time_to}`,
+      time_from: timeFrom,
+      time_to:   timeTo,
+      duration_minutes: dur,
+    }]
   }
 
   async function handleDelete() {
@@ -469,6 +641,17 @@ export default function MachineLossInputPage() {
         form={form} formError={formError}
         lines={lines} shifts={shifts} feedCodes={feedCodes} allLosses={allLosses}
         onFormChange={setForm} onSave={handleSave} onClose={() => setDialogOpen(false)}
+      />
+
+      <SplitShiftPreviewDialog
+        open={splitPreviewOpen}
+        splits={splitPreview}
+        form={pendingForm ?? form}
+        shifts={shifts}
+        allLosses={allLosses}
+        isSaving={isSaving}
+        onConfirm={() => commitSave(pendingForm ?? form, splitPreview)}
+        onBack={() => { setSplitPreviewOpen(false); setDialogOpen(true) }}
       />
 
       <ConfirmDialog open={!!deleteId} onClose={() => setDeleteId(null)} onConfirm={handleDelete}
