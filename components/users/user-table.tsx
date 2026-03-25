@@ -10,7 +10,7 @@ import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Loader2, Pencil, Factory, Power, PowerOff, ShieldCheck, KeyRound, AlertTriangle } from 'lucide-react'
+import { Loader2, Pencil, Factory, Power, PowerOff, ShieldCheck, KeyRound, AlertTriangle, LayoutDashboard } from 'lucide-react'
 import { ApiUser, ApiPlant } from '@/types/api'
 import { cn } from '@/lib/utils'
 
@@ -33,17 +33,18 @@ function initials(name: string) {
 }
 
 type Props = {
-  users:          ApiUser[]
-  plants:         ApiPlant[]
-  isLoading:      boolean
-  isSuperuser:    boolean        // current logged-in user — controls reset password visibility
-  onEdit:         (user: ApiUser) => void
-  onToggleActive: (user: ApiUser) => void
-  onManagePlants: (user: ApiUser) => void
-  onResetPassword:(user: ApiUser) => void
+  users:            ApiUser[]
+  plants:           ApiPlant[]
+  isLoading:        boolean
+  isSuperuser:      boolean
+  onEdit:           (user: ApiUser) => void
+  onToggleActive:   (user: ApiUser) => void
+  onManagePlants:   (user: ApiUser) => void
+  onManageModules:  (user: ApiUser) => void
+  onResetPassword:  (user: ApiUser) => void
 }
 
-export function UserTable({ users, plants, isLoading, isSuperuser, onEdit, onToggleActive, onManagePlants, onResetPassword }: Props) {
+export function UserTable({ users, plants, isLoading, isSuperuser, onEdit, onToggleActive, onManagePlants, onManageModules, onResetPassword }: Props) {
   const plantById = Object.fromEntries(plants.map(p => [p.id, p]))
 
   return (
@@ -74,7 +75,7 @@ export function UserTable({ users, plants, isLoading, isSuperuser, onEdit, onTog
                     <TableHead>Role</TableHead>
                     <TableHead>Akses Plant</TableHead>
                     <TableHead className="text-center">Status</TableHead>
-                    <TableHead className="text-center w-40">Aksi</TableHead>
+                    <TableHead className="text-center w-48">Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -187,6 +188,19 @@ export function UserTable({ users, plants, isLoading, isSuperuser, onEdit, onTog
                               </Button>
                             </TooltipTrigger>
                             <TooltipContent>Kelola Akses Plant</TooltipContent>
+                          </Tooltip>
+
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="sm" variant="ghost"
+                                className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
+                                onClick={() => onManageModules(u)}
+                              >
+                                <LayoutDashboard className="h-3.5 w-3.5" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Atur Akses Module</TooltipContent>
                           </Tooltip>
 
                           {/* Reset password — superuser only, not self */}

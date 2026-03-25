@@ -4,6 +4,8 @@ import {
   Shield, Database, Bell, FolderOpen, GaugeCircle,
   Timer, Factory, Package, Activity, Workflow,
   LineChart, BarChart2, TrendingUp, Clock, Gauge,
+  GaugeCircleIcon,
+  FullscreenIcon,
 } from 'lucide-react';
 import {
   OEE_MASTER_ROLES, OEE_INPUT_ROLES, OEE_VIEW_ROLES,
@@ -30,6 +32,12 @@ export const menuItems: MenuItem[] = [
     title: 'Dashboard',
     href: '/dashboard',
     icon: LayoutDashboard,
+    roles: ['admin', 'manager', 'user', 'viewer'],
+  },
+  {
+    title: 'Turnover Dashboard',
+    href: '/scm-turnover',
+    icon: FullscreenIcon,
     roles: ['admin', 'manager', 'user', 'viewer'],
   },
 
@@ -91,6 +99,47 @@ export function getMenuItemsForRole(role: UserRole): MenuItem[] {
     .filter((item) => item.roles.includes(role))
     .map((item) => ({
       ...item,
+      children: item.children?.filter((c) => c.roles.includes(role)),
+    }));
+}
+
+/**
+ * Returns menu items filtered by:
+ * 1. Custom module permissions (if user has any set) — bypasses role check for top-level modules
+ * 2. Role-based defaults (if no custom permissions set)
+ *
+ * Sub-menu items (OEE children) are still filtered by role within each allowed module.
+ *
+ * @param role - the user's role (used for sub-menu filtering and fallback)
+ * @param allowedModules - list of module keys from user_module_permissions, or null/empty = use role defaults
+ */
+export function getMenuItemsForUser(
+  role: UserRole,
+  allowedModules: string[] | null | undefined,
+): MenuItem[] {
+  // No custom modules set → fall back to role-based filtering
+  if (!allowedModules || allowedModules.length === 0) {
+    return getMenuItemsForRole(role);
+  }
+
+  // Map route href → module key
+  const hrefToModule = (href: string): string => {
+    if (href.startsWith('/oee'))      return 'oee';
+    if (href.startsWith('/users'))    return 'users';
+    if (href.startsWith('/plants'))   return 'plants';
+    if (href.startsWith('/settings')) return 'settings';
+    if (href.startsWith('/dashboard'))return 'dashboard';
+    return '';
+  };
+
+  return menuItems
+    .filter((item) => {
+      const mod = hrefToModule(item.href);
+      return mod ? allowedModules.includes(mod) : false;
+    })
+    .map((item) => ({
+      ...item,
+      // Sub-items still filtered by role (e.g. OEE master only for admin/manager)
       children: item.children?.filter((c) => c.roles.includes(role)),
     }));
 }

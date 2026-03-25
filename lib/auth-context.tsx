@@ -37,10 +37,14 @@ interface AuthContextType {
   activePlant: Plant | null;
   accessiblePlants: Plant[];
   isLoading: boolean;
+  /** null = tidak ada custom override (pakai role default) */
+  modulePermissions: string[] | null;
   login: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   selectPlant: (plant: Plant) => void;
   updateUser: (patch: Partial<User>) => void;
+  /** Dipanggil setelah admin ubah module permissions — update state jika userId == currentUser */
+  refreshModulePermissions: (userId: number, modules: string[]) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -51,6 +55,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [activePlant, setActivePlant] = useState<Plant | null>(null);
   const [accessiblePlants, setAccessiblePlants] = useState<Plant[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [modulePermissions, setModulePermissions] = useState<string[] | null>(null);
 
   const mapApiPlant = (p: ApiPlant): Plant => ({
     id: p.id,
@@ -67,10 +72,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem('accessible_plants');
     localStorage.removeItem('active_plant_id');
     localStorage.removeItem('active_plant');
+    localStorage.removeItem('module_permissions');
     setUser(null);
     setToken(null);
     setActivePlant(null);
     setAccessiblePlants([]);
+    setModulePermissions(null);
   }, []);
 
   const login = useCallback(async (username: string, password: string) => {
@@ -99,6 +106,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('refresh_token', data.token.refresh_token);
     localStorage.setItem('user', JSON.stringify(mappedUser));
     localStorage.setItem('accessible_plants', JSON.stringify(plants));
+
+    // Fetch module permissions for this user (uses /me/modules — no superuser required)
+    try {
+      const resp = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/v1/users/me/modules`,
+        { headers: { Authorization: `Bearer ${data.token.access_token}` } }
+      );
+      if (resp.ok) {
+        const modData = await resp.json();
+        const mods: string[] | null = modData.use_role_default ? null : modData.modules;
+        setModulePermissions(mods);
+        localStorage.setItem('module_permissions', JSON.stringify(mods));
+      }
+    } catch {
+      // Non-fatal — fallback to role defaults
+      setModulePermissions(null);
+    }
 
     // Auto-select plant: restore last used, or auto-select if only one
     const savedPlantId = localStorage.getItem('active_plant_id');
@@ -134,6 +158,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const savedUser = localStorage.getItem('user');
       const savedPlants = localStorage.getItem('accessible_plants');
       const savedPlant = localStorage.getItem('active_plant');
+      const savedModules = localStorage.getItem('module_permissions');
 
       if (savedToken && savedUser) {
         const parsedUser: User = JSON.parse(savedUser);
@@ -143,6 +168,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(parsedUser);
         if (savedPlants) setAccessiblePlants(JSON.parse(savedPlants));
         if (savedPlant) setActivePlant(JSON.parse(savedPlant));
+        if (savedModules !== null) {
+          setModulePermissions(JSON.parse(savedModules));
+        }
       }
     } catch {
       clearSession();
@@ -160,8 +188,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const refreshModulePermissions = useCallback((userId: number, modules: string[]) => {
+    // Update in-memory state only if the changed user is the currently logged-in user
+    setUser(prev => {
+      if (!prev) return prev;
+      if (prev.id === userId) {
+        const mods = modules.length === 0 ? null : modules;
+        setModulePermissions(mods);
+        localStorage.setItem('module_permissions', JSON.stringify(mods));
+      }
+      return prev;
+    });
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, token, activePlant, accessiblePlants, isLoading, login, logout, selectPlant, updateUser }}>
+    <AuthContext.Provider value={{
+      user, token, activePlant, accessiblePlants, isLoading,
+      modulePermissions,
+      login, logout, selectPlant, updateUser, refreshModulePermissions,
+    }}>
       {children}
     </AuthContext.Provider>
   );

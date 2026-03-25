@@ -1,5 +1,11 @@
 export interface ApiRole { id: number; name: string }
 
+export interface ApiUserModulePermissions {
+  user_id: number
+  modules: string[]          // e.g. ['dashboard', 'oee', 'settings']
+  use_role_default: boolean  // true = no custom overrides set
+}
+
 export interface ApiUser {
   id: number; username: string; email: string;
   full_name: string; role: ApiRole; is_active: boolean;

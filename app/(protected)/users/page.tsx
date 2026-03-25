@@ -13,16 +13,17 @@ import { ApiUser, ApiPlant } from '@/types/api'
 import { ApiRole } from '@/services/userService'
 import { useAuth } from '@/lib/auth-context'
 
-import { UserTable }       from '@/components/users/user-table'
+import { UserTable }        from '@/components/users/user-table'
 import { UserFormDialog, UserFormState, EMPTY_USER_FORM } from '@/components/users/user-form-dialog'
-import { UserPlantDialog } from '@/components/users/user-plant-dialog'
+import { UserPlantDialog }  from '@/components/users/user-plant-dialog'
+import { UserModuleDialog } from '@/components/users/user-module-dialog'
 import {
   createUser, deactivateUser, listPlants, listRoles, listUsers,
   updateUser, resetPassword,
 } from '@/services/userService'
 
 export default function UsersPage() {
-  const { user: currentUser } = useAuth()
+  const { user: currentUser, refreshModulePermissions } = useAuth()
 
   const [users,  setUsers]  = useState<ApiUser[]>([])
   const [roles,  setRoles]  = useState<ApiRole[]>([])
@@ -38,6 +39,9 @@ export default function UsersPage() {
   const [plantTarget,     setPlantTarget]     = useState<ApiUser | null>(null)
   const [plantDialogOpen, setPlantDialogOpen] = useState(false)
   const [isSavingPlants,  setIsSavingPlants]  = useState(false)
+
+  const [moduleTarget,     setModuleTarget]     = useState<ApiUser | null>(null)
+  const [moduleDialogOpen, setModuleDialogOpen] = useState(false)
 
   const [deactivateTarget, setDeactivateTarget] = useState<ApiUser | null>(null)
   const [isDeactivating,   setIsDeactivating]   = useState(false)
@@ -181,6 +185,10 @@ export default function UsersPage() {
     setTimeout(() => setCopied(false), 2000)
   }
 
+  function handleModuleSaved(userId: number, modules: string[]) {
+    refreshModulePermissions(userId, modules)
+  }
+
   const totalActive   = users.filter(u => u.is_active).length
   const totalInactive = users.filter(u => !u.is_active).length
 
@@ -235,6 +243,7 @@ export default function UsersPage() {
             onEdit={openEdit}
             onToggleActive={handleToggleActive}
             onManagePlants={user => { setPlantTarget(user); setPlantDialogOpen(true) }}
+            onManageModules={user => { setModuleTarget(user); setModuleDialogOpen(true) }}
             onResetPassword={setResetTarget}
           />
         </div>
@@ -262,6 +271,13 @@ export default function UsersPage() {
           onClose={() => setPlantDialogOpen(false)}
         />
       )}
+
+      <UserModuleDialog
+        open={moduleDialogOpen}
+        user={moduleTarget}
+        onSaved={handleModuleSaved}
+        onClose={() => { setModuleDialogOpen(false); setModuleTarget(null) }}
+      />
 
       {/* Confirm Reset Password */}
       <ConfirmDialog

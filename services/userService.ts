@@ -4,7 +4,7 @@
  */
 
 import { api } from '@/lib/api-client'
-import { ApiUser, ApiPlant } from '@/types/api'
+import { ApiUser, ApiPlant, ApiUserModulePermissions } from '@/types/api'
 
 export interface ApiRole {
   id: number
@@ -50,3 +50,11 @@ export const listRoles = () =>
 
 export const listPlants = () =>
   api.get<ApiPlant[]>('/api/v1/plants/', { withPlant: false })
+
+// ─── Module Permissions ───────────────────────────────────────────────────────
+
+export const getUserModules = (userId: number) =>
+  api.get<ApiUserModulePermissions>(`/api/v1/users/${userId}/modules`, { withPlant: false })
+
+export const setUserModules = (userId: number, modules: string[]) =>
+  api.put<ApiUserModulePermissions>(`/api/v1/users/${userId}/modules`, { modules }, { withPlant: false })

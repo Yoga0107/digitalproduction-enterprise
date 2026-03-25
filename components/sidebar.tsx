@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
-import { getMenuItemsForRole, MenuItem } from '@/lib/route-config';
+import { getMenuItemsForUser, MenuItem } from '@/lib/route-config';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -134,7 +134,7 @@ function SimpleMenuItem({
 
 // ─── Main Sidebar ─────────────────────────────────────────────────────────────
 export function Sidebar() {
-  const { user, logout, activePlant, accessiblePlants } = useAuth();
+  const { user, logout, activePlant, accessiblePlants, modulePermissions } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
@@ -144,7 +144,7 @@ export function Sidebar() {
 
   if (!user) return null;
 
-  const menuItems = getMenuItemsForRole(user.role);
+  const menuItems = getMenuItemsForUser(user.role, modulePermissions);
   const initials = (user.full_name || user.username || 'U')
     .split(' ').map((n: string) => n[0] ?? '').join('').toUpperCase().slice(0, 2);
 

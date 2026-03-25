@@ -16,10 +16,8 @@ import { toast } from 'sonner'
 import { Loader2, Plus, Pencil, Trash2, AlertCircle, Clock, Timer } from 'lucide-react'
 import { ApiError } from '@/lib/api-client'
 
-// ─── Shift 1–10 preset names (hardcode) ──────────────────────────────────
-// Hanya nama yang di-hardcode. Waktu tetap diisi manual.
 const SHIFT_NAMES = [
-  'Shift 1', 'Shift 2', 'Shift 3', 'Shift 4'
+  'Shift 1', 'Shift 2', 'Shift 3'
 ]
 
 type ShiftRow = { id: number; name: string; from: string; to: string; remarks: string }
@@ -263,7 +261,7 @@ export default function MasterShiftPage() {
                   </SelectTrigger>
                   <SelectContent>
                     {editing
-                      // Saat edit: tampilkan nama yang sedang diedit + yang belum terdaftar
+                   
                       ? SHIFT_NAMES.map(name => {
                           const takenByOther = rows.some(r => r.name === name && r.id !== editing.id)
                           return (

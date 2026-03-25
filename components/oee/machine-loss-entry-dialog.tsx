@@ -11,7 +11,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import {
-  AlertCircle, Loader2, Wrench, Clock, Tag, CheckCircle2,
+  AlertCircle, Loader2, Wrench, Clock, Tag, CheckCircle2, AlertTriangle,
 } from 'lucide-react'
 import { ApiLine, ApiShift, ApiMachineLoss, ApiFeedCode } from '@/types/api'
 import { cn } from '@/lib/utils'
@@ -132,8 +132,8 @@ export function MachineLossEntryDialog({
 
   // Step completion states
   const step1Done = !!(form.date && form.line_id && form.shift_id)
-  const step2Done = step1Done   // step 2 is always optional, just needs step 1 done to unlock
-  const step3Done = !!form.loss_l1_id
+  const step2Done = !!form.feed_code_id   // step 2 is always optional, just needs step 1 done to unlock
+  const step3Done = !!(form.loss_l1_id && form.loss_l2_id && form.loss_l3_id)   // step 3 is done when at least L1 and L2 are selected. L3 is optional and depends on L2.
   const step4Done = !!(form.duration_hours && Number(form.duration_hours) > 0)
 
   // Cascading loss options
@@ -156,6 +156,24 @@ export function MachineLossEntryDialog({
   const autoHours    = calcDurationHours(form.time_from, form.time_to)
   const hasAutoHours = !!(form.time_from && form.time_to && autoHours > 0)
   const displayHours = hasAutoHours ? autoHours : (Number(form.duration_hours) || 0)
+
+  // ── Cross-shift detection ─────────────────────────────────────────────────
+  const selectedShift = shifts.find(s => String(s.id) === form.shift_id)
+  const crossShiftWarning = (() => {
+    if (!form.time_from || !form.time_to || !selectedShift) return null
+    const toMin = (hhmm: string) => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m }
+    const fromMin   = toMin(form.time_from)
+    const endMin    = toMin(form.time_to)
+    const shiftEnd  = toMin(selectedShift.time_to)
+    // Handle time_to < time_from (overnight) or endMin > shiftEnd
+    const adjustedEnd = endMin <= fromMin ? endMin + 24 * 60 : endMin
+    const adjustedShiftEnd = shiftEnd <= toMin(selectedShift.time_from) ? shiftEnd + 24 * 60 : shiftEnd
+    if (adjustedEnd > adjustedShiftEnd) {
+      const overMin = adjustedEnd - adjustedShiftEnd
+      return `Downtime melewati batas shift (${selectedShift.time_to}) sejauh ${fmtHours(overMin / 60)}. Data akan otomatis disimpan dalam ${Math.min(shifts.length, 2)} record terpisah.`
+    }
+    return null
+  })()
 
   function handleL1Change(val: string) {
     set({ loss_l1_id: val === 'none' ? '' : val, loss_l2_id: '', loss_l3_id: '' })
@@ -274,7 +292,7 @@ export function MachineLossEntryDialog({
             label="Machine Loss Category"
             icon={Wrench}
             locked={!step2Done}
-            done={step3Done}
+            done={step3Done && !!step2Done}
           >
             {/* Breadcrumb preview */}
             {selL1 && (
@@ -433,6 +451,17 @@ export function MachineLossEntryDialog({
                 )}
               </div>
             </div>
+
+            {/* ── Cross-shift warning ── */}
+            {crossShiftWarning && (
+              <div className="flex items-start gap-2.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5">
+                <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                <div className="text-xs text-amber-800 space-y-0.5">
+                  <p className="font-semibold">Downtime Melewati Batas Shift</p>
+                  <p>{crossShiftWarning}</p>
+                </div>
+              </div>
+            )}
 
             <div className="space-y-1.5">
               <Label className="text-xs">Keterangan</Label>

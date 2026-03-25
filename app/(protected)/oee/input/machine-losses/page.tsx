@@ -217,20 +217,61 @@ export default function MachineLossInputPage() {
 
     setIsSaving(true)
     try {
-      const payload = {
-        date: new Date(form.date).toISOString(), line_id: Number(form.line_id), shift_id: Number(form.shift_id),
+      const basePayload = {
+        date: new Date(form.date).toISOString(), line_id: Number(form.line_id),
         feed_code_id: form.feed_code_id ? Number(form.feed_code_id) : null,
         loss_l1_id: form.loss_l1_id ? Number(form.loss_l1_id) : null,
         loss_l2_id: form.loss_l2_id ? Number(form.loss_l2_id) : null,
         loss_l3_id: form.loss_l3_id ? Number(form.loss_l3_id) : null,
-        time_from: form.time_from || null, time_to: form.time_to || null,
-        duration_minutes: dur, remarks: form.remarks || undefined,
+        remarks: form.remarks || undefined,
       }
+
       if (editing) {
+        // Edit mode: simpan langsung tanpa split
+        const payload = {
+          ...basePayload,
+          shift_id: Number(form.shift_id),
+          time_from: form.time_from || null,
+          time_to: form.time_to || null,
+          duration_minutes: dur,
+        }
         const u = await updateMachineLossInput(editing.id, payload)
         setRows(prev => prev.map(r => r.id === editing.id ? u : r))
         toast.success('Data berhasil diperbarui')
+        setDialogOpen(false)
+        return
+      }
+
+      // ── Create mode: cek apakah downtime melewati shift boundary ──────────
+      const selectedShift = shifts.find(s => String(s.id) === form.shift_id)
+      const splitRecords = buildSplitRecords(
+        form.date,
+        form.time_from,
+        form.time_to,
+        dur,
+        Number(form.shift_id),
+        selectedShift ?? null,
+        shifts,
+      )
+
+      if (splitRecords.length > 1) {
+        // Simpan semua split record
+        const created = await Promise.all(
+          splitRecords.map(sr => createMachineLossInput({ ...basePayload, ...sr }))
+        )
+        setRows(prev => [...created.reverse(), ...prev])
+        toast.success(
+          `Data disimpan sebagai ${created.length} record (melewati ${created.length - 1} batas shift)`
+        )
       } else {
+        // Normal: satu record
+        const payload = {
+          ...basePayload,
+          shift_id: Number(form.shift_id),
+          time_from: form.time_from || null,
+          time_to: form.time_to || null,
+          duration_minutes: dur,
+        }
         const c = await createMachineLossInput(payload)
         setRows(prev => [c, ...prev])
         toast.success('Data berhasil disimpan')
@@ -240,6 +281,84 @@ export default function MachineLossInputPage() {
       if (err instanceof ApiError) setFormError(err.detail)
       else toast.error('Gagal menyimpan data')
     } finally { setIsSaving(false) }
+  }
+
+  function buildSplitRecords(
+    date: string,
+    timeFrom: string,
+    timeTo: string,
+    durationHours: number,
+    shiftId: number,
+    selectedShift: ApiShift | null,
+    allShifts: ApiShift[],
+  ): Array<{ shift_id: number; time_from: string | null; time_to: string | null; duration_minutes: number }> {
+    // Jika tidak ada time_from/time_to, tidak bisa split — pakai satu record
+    if (!timeFrom || !timeTo || !selectedShift) {
+      return [{ shift_id: shiftId, time_from: timeFrom || null, time_to: timeTo || null, duration_minutes: durationHours }]
+    }
+
+    const toMinutes = (hhmm: string) => {
+      const [h, m] = hhmm.split(':').map(Number)
+      return h * 60 + m
+    }
+    const toHHMM = (minutes: number) => {
+      const h = Math.floor(minutes / 60) % 24
+      const m = minutes % 60
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+    }
+
+    // Build sorted shift list by start time (handle overnight shifts)
+    const sortedShifts = [...allShifts].sort((a, b) => toMinutes(a.time_from) - toMinutes(b.time_from))
+
+    let curFromMin = toMinutes(timeFrom)
+    const endMin   = toMinutes(timeTo)
+
+    // Handle time_to < time_from (melewati tengah malam) — tambah 24 jam
+    const adjustedEnd = endMin <= curFromMin ? endMin + 24 * 60 : endMin
+
+    const records: Array<{ shift_id: number; time_from: string | null; time_to: string | null; duration_minutes: number }> = []
+
+    let currentShiftId = shiftId
+    let safetyLimit    = 0
+
+    while (curFromMin < adjustedEnd && safetyLimit < 10) {
+      safetyLimit++
+      const currentShift = allShifts.find(s => s.id === currentShiftId)
+      if (!currentShift) break
+
+      const shiftEndMin = toMinutes(currentShift.time_to)
+      // Normalise shift end: if shift end <= shift start, shift crosses midnight
+      const adjustedShiftEnd = shiftEndMin <= toMinutes(currentShift.time_from)
+        ? shiftEndMin + 24 * 60
+        : shiftEndMin
+
+      const sliceEnd = Math.min(adjustedEnd, adjustedShiftEnd)
+      const durationMin = sliceEnd - curFromMin
+
+      records.push({
+        shift_id: currentShiftId,
+        time_from: toHHMM(curFromMin % (24 * 60)),
+        time_to:   toHHMM(sliceEnd % (24 * 60)),
+        duration_minutes: Math.round(durationMin),  // backend expects minutes
+      })
+
+      if (sliceEnd >= adjustedEnd) break
+
+      // Find next shift
+      curFromMin = sliceEnd
+      const nextShift = sortedShifts.find(s => {
+        const sStart = toMinutes(s.time_from)
+        return sStart === sliceEnd % (24 * 60) || sStart === curFromMin % (24 * 60)
+      }) ?? sortedShifts.find(s => s.id !== currentShiftId)
+
+      if (!nextShift) break
+      currentShiftId = nextShift.id
+    }
+
+    // Fallback: jika gagal split, kembalikan satu record asli
+    return records.length > 0 ? records : [
+      { shift_id: shiftId, time_from: timeFrom, time_to: timeTo, duration_minutes: durationHours }
+    ]
   }
 
   async function handleDelete() {
