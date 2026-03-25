@@ -84,7 +84,7 @@ export interface ApiStandardThroughput {
 
 export interface ApiProductionOutputItem {
   item_id:         number
-  output_id:       number
+  group_id:        string
   date:            string
   line_id:         number
   line_name:       string | null
@@ -93,18 +93,20 @@ export interface ApiProductionOutputItem {
   feed_code_id:    number | null
   feed_code_code:  string | null
   output_type:     'finished_goods' | 'downgraded_product' | 'wip' | 'remix' | 'reject_product'
+  category:        'FG' | 'DOWNGRADED' | 'WIP' | 'REMIX' | 'REJECT'
   quantity:        number
   remarks:         string | null
 }
 
 export interface ApiProductionOutput {
-  id: number
+  /** group_id (UUID string) — ties 5 rows together; used for edit/delete */
+  id: string
   date: string
   line_id: number
   shift_id: number
   feed_code_id: number | null
   production_plan: number | null
-  // 5 input fields
+  // 5 output quantities (flattened from 5 DB rows)
   finished_goods: number
   downgraded_product: number
   wip: number

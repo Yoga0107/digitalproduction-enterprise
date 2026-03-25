@@ -94,7 +94,7 @@ export const createProductionOutput = (data: {
 }) => api.post<ApiProductionOutput>('/api/v1/input/production-outputs', data)
 
 export const updateProductionOutput = (
-  id: number,
+  id: string,  // group_id
   data: Partial<{
     date: string; line_id: number; shift_id: number
     feed_code_id: number | null; production_plan: number | null
@@ -103,7 +103,7 @@ export const updateProductionOutput = (
   }>
 ) => api.put<ApiProductionOutput>(`/api/v1/input/production-outputs/${id}`, data)
 
-export const deleteProductionOutput = (id: number) =>
+export const deleteProductionOutput = (id: string) =>  // group_id
   api.delete(`/api/v1/input/production-outputs/${id}`)
 
 /** Get production outputs broken down by type (finished_goods, downgraded_product, etc.) */

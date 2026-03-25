@@ -210,7 +210,7 @@ export default function OutputPage() {
   const [filterType, setFilterType]   = useState('all')
   const [activeTab, setActiveTab]     = useState<'summary' | 'bytype'>('summary')
 
-  const [deleteId, setDeleteId]       = useState<number | null>(null)
+  const [deleteId, setDeleteId]       = useState<string | null>(null)
   const [isDeleting, setIsDeleting]   = useState(false)
 
   const [outputByType, setOutputByType]   = useState<ApiProductionOutputItem[]>([])
@@ -282,7 +282,7 @@ export default function OutputPage() {
         const u = await updateProductionOutput(editing.id, payload)
         setRows(prev => prev.map(r => r.id === editing.id ? u : r))
         toast.success('Data berhasil diperbarui')
-        setOutputByType(prev => prev.map(i => i.output_id === editing.id
+        setOutputByType(prev => prev.map(i => i.group_id === editing.id
           ? { ...i, quantity: (payload as any)[i.output_type] ?? i.quantity } : i))
       } else {
         const c = await createProductionOutput(payload)
@@ -304,7 +304,7 @@ export default function OutputPage() {
     try {
       await deleteProductionOutput(deleteId)
       setRows(prev => prev.filter(r => r.id !== deleteId))
-      setOutputByType(prev => prev.filter(i => i.output_id !== deleteId))
+      setOutputByType(prev => prev.filter(i => i.group_id !== deleteId))
       toast.success('Data berhasil dihapus')
     } catch { toast.error('Gagal menghapus data') }
     finally { setIsDeleting(false); setDeleteId(null) }
