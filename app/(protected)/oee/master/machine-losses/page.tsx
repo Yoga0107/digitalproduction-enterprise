@@ -1,211 +1,361 @@
-"use client"
+'use client'
 
-import { useState, useEffect, useCallback, useRef } from "react"
-import { OeeGuard } from "@/components/oee/oee-guard"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { MachineLossTree, LossNode, MovePayload } from "@/components/oee/machine-loss-tree"
+import { useState, useEffect, useCallback } from 'react'
+import { OeeGuard } from '@/components/oee/oee-guard'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
-  getMachineLosses,
-  createLossLevel1, updateLossLevel1, deleteLossLevel1,
-  createLossLevel2, updateLossLevel2, deleteLossLevel2,
-  createLossLevel3, updateLossLevel3, deleteLossLevel3,
-  moveMachineLoss,
-} from "@/services/masterService"
-import { ApiMachineLoss } from "@/types/api"
-import { toast } from "sonner"
-import { Loader2, Plus, RefreshCw, Check, X, Workflow } from "lucide-react"
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from '@/components/ui/dialog'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
+import { ConfirmDialog } from '@/components/confirm-dialog'
+import {
+  getMachineLossLvl1, createMachineLossLvl1, updateMachineLossLvl1, deleteMachineLossLvl1,
+  getMachineLossLvl2, createMachineLossLvl2, updateMachineLossLvl2, deleteMachineLossLvl2,
+  getMachineLossLvl3, createMachineLossLvl3, updateMachineLossLvl3, deleteMachineLossLvl3,
+  getMasterMachineLosses, createMasterMachineLoss, deleteMasterMachineLoss,
+} from '@/services/masterService'
+import {
+  ApiMachineLossLvl1, ApiMachineLossLvl2, ApiMachineLossLvl3, ApiMasterMachineLoss,
+} from '@/types/api'
+import { toast } from 'sonner'
+import {
+  Loader2, Plus, Pencil, Trash2, Workflow, ChevronRight,
+  Layers, Database, Check, X,
+} from 'lucide-react'
+import { cn } from '@/lib/utils'
 
-// ─── Tree builder ─────────────────────────────────────────────────────────────
-function buildTree(flat: ApiMachineLoss[]): LossNode[] {
-  const map = new Map<number, LossNode>()
-  flat.forEach(n => map.set(n.id, {
-    id: n.id, parent_id: n.parent_id,
-    level: n.level, name: n.name,
-    sort_order: n.sort_order, children: [],
-  }))
-  const roots: LossNode[] = []
-  map.forEach(node => {
-    if (node.parent_id === null) roots.push(node)
-    else {
-      const parent = map.get(node.parent_id)
-      if (parent) parent.children.push(node)
-      else roots.push(node)
-    }
-  })
-  const sort = (ns: LossNode[]) => {
-    ns.sort((a, b) => a.sort_order - b.sort_order || a.id - b.id)
-    ns.forEach(n => sort(n.children))
+// ─── Inline editable row ──────────────────────────────────────────────────────
+function LevelRow({
+  id, name, badgeColor, onEdit, onDelete,
+  selected, onClick,
+  childCount,
+}: {
+  id: number; name: string; badgeColor: string
+  onEdit: (id: number, name: string) => void
+  onDelete: (id: number) => void
+  selected?: boolean; onClick?: () => void; childCount?: number
+}) {
+  const [editing, setEditing] = useState(false)
+  const [val, setVal] = useState(name)
+  const [saving, setSaving] = useState(false)
+
+  async function save() {
+    if (!val.trim() || val.trim() === name) { setEditing(false); setVal(name); return }
+    setSaving(true)
+    await onEdit(id, val.trim())
+    setSaving(false); setEditing(false)
   }
-  sort(roots)
-  return roots
+
+  return (
+    <div
+      className={cn(
+        'group flex items-center gap-2 px-3 py-2.5 rounded-lg border transition-all cursor-pointer',
+        selected
+          ? 'bg-teal-50 border-teal-300 shadow-sm'
+          : 'bg-white border-slate-100 hover:border-teal-200 hover:bg-slate-50',
+      )}
+      onClick={() => !editing && onClick?.()}
+    >
+      <span className={cn('text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0', badgeColor)}>
+        {id}
+      </span>
+
+      {editing ? (
+        <Input
+          autoFocus
+          value={val}
+          onChange={e => setVal(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') { setEditing(false); setVal(name) } }}
+          className="h-7 text-sm flex-1"
+          onClick={e => e.stopPropagation()}
+        />
+      ) : (
+        <span className="flex-1 text-sm font-medium truncate">{name}</span>
+      )}
+
+      {childCount !== undefined && childCount > 0 && !editing && (
+        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 shrink-0">
+          {childCount}
+        </Badge>
+      )}
+
+      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+        onClick={e => e.stopPropagation()}>
+        {editing ? (
+          <>
+            <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-emerald-600 hover:bg-emerald-50"
+              onClick={save} disabled={saving}>
+              {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+            </Button>
+            <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-slate-400 hover:bg-slate-100"
+              onClick={() => { setEditing(false); setVal(name) }}>
+              <X className="h-3 w-3" />
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-slate-400 hover:text-blue-600 hover:bg-blue-50"
+              onClick={() => setEditing(true)} title="Edit">
+              <Pencil className="h-3 w-3" />
+            </Button>
+            <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50"
+              onClick={() => onDelete(id)} title="Hapus">
+              <Trash2 className="h-3 w-3" />
+            </Button>
+          </>
+        )}
+      </div>
+
+      {selected && onClick && (
+        <ChevronRight className="h-4 w-4 text-teal-500 shrink-0 ml-1" />
+      )}
+    </div>
+  )
 }
 
-// Optimistic update: pindah L3 ke parent baru di flat array tanpa fetch
-function applyOptimisticMove(flat: ApiMachineLoss[], nodeId: number, newParentId: number): ApiMachineLoss[] {
-  return flat.map(n => n.id === nodeId ? { ...n, parent_id: newParentId } : n)
+// ─── Add row inline ────────────────────────────────────────────────────────────
+function AddRow({ onAdd, placeholder }: { onAdd: (name: string) => Promise<void>; placeholder: string }) {
+  const [open, setOpen] = useState(false)
+  const [val, setVal] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  async function save() {
+    if (!val.trim()) return
+    setSaving(true)
+    await onAdd(val.trim())
+    setSaving(false); setVal(''); setOpen(false)
+  }
+
+  if (!open) return (
+    <Button size="sm" variant="ghost" className="w-full justify-start text-slate-400 hover:text-teal-700 hover:bg-teal-50 gap-1.5 mt-1"
+      onClick={() => setOpen(true)}>
+      <Plus className="h-3.5 w-3.5" /> Tambah
+    </Button>
+  )
+
+  return (
+    <div className="flex items-center gap-1.5 mt-1">
+      <Input
+        autoFocus value={val}
+        onChange={e => setVal(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') { setOpen(false); setVal('') } }}
+        placeholder={placeholder}
+        className="h-7 text-sm flex-1"
+      />
+      <Button size="sm" className="h-7 px-2 bg-teal-600 hover:bg-teal-700" onClick={save} disabled={saving || !val.trim()}>
+        {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+      </Button>
+      <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => { setOpen(false); setVal('') }}>
+        <X className="h-3 w-3" />
+      </Button>
+    </div>
+  )
 }
 
-function countAll(ns: LossNode[]): number {
-  return ns.reduce((acc, n) => acc + 1 + countAll(n.children), 0)
+// ─── Katalog Dialog ────────────────────────────────────────────────────────────
+function KatalogDialog({
+  open, onClose, onSave,
+  lvl1List, lvl2List, lvl3List,
+  isSaving,
+}: {
+  open: boolean; onClose: () => void
+  onSave: (lvl1_id: number, lvl2_id: number | null, lvl3_id: number | null) => Promise<void>
+  lvl1List: ApiMachineLossLvl1[]; lvl2List: ApiMachineLossLvl2[]; lvl3List: ApiMachineLossLvl3[]
+  isSaving: boolean
+}) {
+  const [selL1, setSelL1] = useState('')
+  const [selL2, setSelL2] = useState('')
+  const [selL3, setSelL3] = useState('')
+
+  const filtL2 = lvl2List.filter(l => l.lvl1_id === Number(selL1))
+  const filtL3 = lvl3List.filter(l => l.lvl2_id === Number(selL2))
+
+  function reset() { setSelL1(''); setSelL2(''); setSelL3('') }
+
+  async function handleSave() {
+    if (!selL1) return
+    await onSave(Number(selL1), selL2 ? Number(selL2) : null, selL3 ? Number(selL3) : null)
+    reset()
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={() => { onClose(); reset() }}>
+      <DialogContent className="sm:max-w-[440px]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Database className="h-5 w-5 text-teal-600" />
+            Tambah Kombinasi Loss
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 py-1">
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold flex items-center gap-1.5">
+              <span className="px-1.5 py-0.5 rounded bg-red-100 text-red-700 text-[10px] font-bold">L1</span>
+              Loss Category <span className="text-red-500">*</span>
+            </label>
+            <Select value={selL1} onValueChange={v => { setSelL1(v); setSelL2(''); setSelL3('') }}>
+              <SelectTrigger className={cn(selL1 && 'border-red-200 bg-red-50/40')}>
+                <SelectValue placeholder="Pilih L1…" />
+              </SelectTrigger>
+              <SelectContent>
+                {lvl1List.map(l => <SelectItem key={l.id} value={String(l.id)}>{l.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {selL1 && (
+            <div className="space-y-1.5 pl-3 border-l-2 border-red-100">
+              <label className="text-xs font-semibold flex items-center gap-1.5">
+                <span className="px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 text-[10px] font-bold">L2</span>
+                Sub Category
+              </label>
+              <Select value={selL2} onValueChange={v => { setSelL2(v); setSelL3('') }} disabled={filtL2.length === 0}>
+                <SelectTrigger className={cn(selL2 && 'border-violet-200 bg-violet-50/40')}>
+                  <SelectValue placeholder={filtL2.length === 0 ? 'Tidak ada sub-kategori' : 'Pilih L2 (opsional)…'} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none"><span className="text-muted-foreground italic">— Tidak ada —</span></SelectItem>
+                  {filtL2.map(l => <SelectItem key={l.id} value={String(l.id)}>{l.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {selL2 && selL2 !== 'none' && (
+            <div className="space-y-1.5 pl-6 border-l-2 border-violet-100">
+              <label className="text-xs font-semibold flex items-center gap-1.5">
+                <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[10px] font-bold">L3</span>
+                Detail Loss
+              </label>
+              <Select value={selL3} onValueChange={setSelL3} disabled={filtL3.length === 0}>
+                <SelectTrigger className={cn(selL3 && 'border-emerald-200 bg-emerald-50/40')}>
+                  <SelectValue placeholder={filtL3.length === 0 ? 'Tidak ada detail' : 'Pilih L3 (opsional)…'} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none"><span className="text-muted-foreground italic">— Tidak ada —</span></SelectItem>
+                  {filtL3.map(l => <SelectItem key={l.id} value={String(l.id)}>{l.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => { onClose(); reset() }}>Batal</Button>
+          <Button onClick={handleSave} disabled={isSaving || !selL1} className="bg-teal-600 hover:bg-teal-700">
+            {isSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            Simpan
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
 }
 
 // ─── Page ──────────────────────────────────────────────────────────────────────
 export default function MachineLossPage() {
-  const [flat, setFlat]           = useState<ApiMachineLoss[]>([])
-  const [tree, setTree]           = useState<LossNode[]>([])
+  const [lvl1List, setLvl1List] = useState<ApiMachineLossLvl1[]>([])
+  const [lvl2List, setLvl2List] = useState<ApiMachineLossLvl2[]>([])
+  const [lvl3List, setLvl3List] = useState<ApiMachineLossLvl3[]>([])
+  const [katalog, setKatalog]   = useState<ApiMasterMachineLoss[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [isSyncing, setIsSyncing] = useState(false)
-  const [addingL1, setAddingL1]   = useState(false)
-  const [newL1, setNewL1]         = useState("")
-  const [savingL1, setSavingL1]   = useState(false)
 
-  // Ref agar callback selalu baca data terbaru tanpa stale closure
-  const flatRef = useRef<ApiMachineLoss[]>([])
-  flatRef.current = flat
+  const [selL1, setSelL1] = useState<number | null>(null)
+  const [selL2, setSelL2] = useState<number | null>(null)
 
-  // Tracking apakah ada full-load yang sedang berjalan (bukan silent sync)
-  const loadingRef  = useRef(false)
-  const syncingFetchRef = useRef(false)
+  const [deleteTarget, setDeleteTarget] = useState<{ type: 'lvl1'|'lvl2'|'lvl3'|'katalog'; id: number } | null>(null)
+  const [isDeleting, setIsDeleting]     = useState(false)
+  const [katalogOpen, setKatalogOpen]   = useState(false)
+  const [isSavingKatalog, setIsSavingKatalog] = useState(false)
 
-  // ── load: fetch dari server ─────────────────────────────────────────────────
-  // silent=true → update data di background tanpa spinner, tidak block drag
-  const load = useCallback(async (silent = false) => {
-    if (!silent) {
-      // Full load: cegah concurrent, tampilkan spinner
-      if (loadingRef.current) return
-      loadingRef.current = true
-      setIsLoading(true)
-    } else {
-      // Silent sync: cegah concurrent silent sync, tapi tidak block full load
-      if (syncingFetchRef.current) return
-      syncingFetchRef.current = true
-    }
-
+  const load = useCallback(async () => {
+    setIsLoading(true)
     try {
-      const data = await getMachineLosses()
-      setFlat(data)
-      setTree(buildTree(data))
-    } catch {
-      if (!silent) toast.error("Gagal memuat machine losses")
-    } finally {
-      if (!silent) {
-        loadingRef.current = false
-        setIsLoading(false)
-      } else {
-        syncingFetchRef.current = false
-      }
-    }
+      const [l1, l2, l3, kat] = await Promise.all([
+        getMachineLossLvl1(), getMachineLossLvl2(), getMachineLossLvl3(), getMasterMachineLosses(),
+      ])
+      setLvl1List(l1); setLvl2List(l2); setLvl3List(l3); setKatalog(kat)
+    } catch { toast.error('Gagal memuat data') }
+    finally { setIsLoading(false) }
   }, [])
 
   useEffect(() => { load() }, [load])
 
-  function findFlat(id: number) {
-    return flatRef.current.find(n => n.id === id)
+  // ── L1 handlers ─────────────────────────────────────────────────────────
+  async function addL1(name: string) {
+    try { await createMachineLossLvl1({ name }); await load(); toast.success('Level 1 ditambahkan') }
+    catch (e: any) { toast.error(e?.detail ?? 'Gagal menambahkan') }
+  }
+  async function editL1(id: number, name: string) {
+    try { await updateMachineLossLvl1(id, { name }); await load(); toast.success('Berhasil diperbarui') }
+    catch (e: any) { toast.error(e?.detail ?? 'Gagal memperbarui') }
   }
 
-  // ── Add L1 ──────────────────────────────────────────────────────────────────
-  async function saveL1() {
-    if (!newL1.trim()) return
-    setSavingL1(true)
+  // ── L2 handlers ─────────────────────────────────────────────────────────
+  async function addL2(name: string) {
+    if (!selL1) return
+    try { await createMachineLossLvl2({ lvl1_id: selL1, name }); await load(); toast.success('Level 2 ditambahkan') }
+    catch (e: any) { toast.error(e?.detail ?? 'Gagal menambahkan') }
+  }
+  async function editL2(id: number, name: string) {
+    try { await updateMachineLossLvl2(id, { name }); await load(); toast.success('Berhasil diperbarui') }
+    catch (e: any) { toast.error(e?.detail ?? 'Gagal memperbarui') }
+  }
+
+  // ── L3 handlers ─────────────────────────────────────────────────────────
+  async function addL3(name: string) {
+    if (!selL2) return
+    try { await createMachineLossLvl3({ lvl2_id: selL2, name }); await load(); toast.success('Level 3 ditambahkan') }
+    catch (e: any) { toast.error(e?.detail ?? 'Gagal menambahkan') }
+  }
+  async function editL3(id: number, name: string) {
+    try { await updateMachineLossLvl3(id, { name }); await load(); toast.success('Berhasil diperbarui') }
+    catch (e: any) { toast.error(e?.detail ?? 'Gagal memperbarui') }
+  }
+
+  // ── Delete handler ───────────────────────────────────────────────────────
+  async function handleDelete() {
+    if (!deleteTarget) return
+    setIsDeleting(true)
     try {
-      await createLossLevel1({ name: newL1.trim(), sort_order: flatRef.current.filter(n => n.level === 1).length })
-      setNewL1(""); setAddingL1(false)
-      toast.success("Level 1 berhasil ditambahkan")
-      await load()
-    } catch {
-      toast.error("Gagal menambahkan Level 1")
-    } finally {
-      setSavingL1(false)
-    }
+      if (deleteTarget.type === 'lvl1') await deleteMachineLossLvl1(deleteTarget.id)
+      else if (deleteTarget.type === 'lvl2') await deleteMachineLossLvl2(deleteTarget.id)
+      else if (deleteTarget.type === 'lvl3') await deleteMachineLossLvl3(deleteTarget.id)
+      else await deleteMasterMachineLoss(deleteTarget.id)
+      toast.success('Berhasil dihapus'); await load()
+    } catch (e: any) { toast.error(e?.detail ?? 'Gagal menghapus') }
+    finally { setIsDeleting(false); setDeleteTarget(null) }
   }
 
-  // ── Add child ───────────────────────────────────────────────────────────────
-  async function handleAddChild(parentId: number, level: 2 | 3, name: string) {
+  // ── Katalog save ─────────────────────────────────────────────────────────
+  async function handleKatalogSave(lvl1_id: number, lvl2_id: number | null, lvl3_id: number | null) {
+    setIsSavingKatalog(true)
     try {
-      const sortOrder = flatRef.current.filter(n => n.parent_id === parentId).length
-      if (level === 2) await createLossLevel2({ level_1_id: parentId, name, sort_order: sortOrder })
-      else             await createLossLevel3({ level_2_id: parentId, name, sort_order: sortOrder })
-      toast.success(`Level ${level} berhasil ditambahkan`)
-      await load()
-    } catch (err: any) {
-      toast.error(err?.detail ?? `Gagal menambahkan Level ${level}`)
-    }
+      await createMasterMachineLoss({ lvl1_id, lvl2_id, lvl3_id })
+      toast.success('Kombinasi berhasil ditambahkan')
+      setKatalogOpen(false); await load()
+    } catch (e: any) { toast.error(e?.detail ?? 'Gagal menyimpan') }
+    finally { setIsSavingKatalog(false) }
   }
 
-  // ── Update name ─────────────────────────────────────────────────────────────
-  async function handleUpdate(id: number, name: string) {
-    const node = findFlat(id)
-    if (!node) return
-    try {
-      if (node.level === 1)      await updateLossLevel1(id, { name })
-      else if (node.level === 2) await updateLossLevel2(id, { name })
-      else                       await updateLossLevel3(id, { name })
-      toast.success("Nama berhasil diperbarui")
-      await load()
-    } catch {
-      toast.error("Gagal memperbarui nama")
-    }
-  }
-
-  // ── Delete ───────────────────────────────────────────────────────────────────
-  async function handleDelete(id: number, hasChildren: boolean) {
-    if (hasChildren) { toast.error("Hapus item anak terlebih dahulu"); return }
-    const node = findFlat(id)
-    if (!node) return
-    try {
-      if (node.level === 1)      await deleteLossLevel1(id)
-      else if (node.level === 2) await deleteLossLevel2(id)
-      else                       await deleteLossLevel3(id)
-      toast.success("Item berhasil dihapus")
-      await load()
-    } catch (err: any) {
-      toast.error(err?.detail ?? "Gagal menghapus item")
-    }
-  }
-
-  // ── Move (dengan optimistic update) ─────────────────────────────────────────
-  async function handleMove(payload: MovePayload) {
-    const node = findFlat(payload.id)
-    if (!node) return
-
-    const isSameLevel  = node.level === payload.new_level
-    const isSameParent = node.parent_id === payload.new_parent_id
-
-    // Sama parent + sama level = tidak ada yang berubah, skip
-    if (isSameLevel && isSameParent) return
-
-    // ── Optimistic update: langsung update UI sebelum API selesai ─────────────
-    if (payload.new_parent_id !== null) {
-      const optimisticFlat = applyOptimisticMove(flatRef.current, payload.id, payload.new_parent_id)
-      setFlat(optimisticFlat)
-      setTree(buildTree(optimisticFlat))
-    }
-
-    setIsSyncing(true)
-    try {
-      await moveMachineLoss(payload.id, {
-        new_parent_id:  payload.new_parent_id,
-        new_level:      payload.new_level,
-        new_sort_order: payload.new_sort_order,
-      })
-      toast.success("Berhasil dipindah ke Sub Category baru")
-      // Silent reload: sync data dari server tanpa trigger loading spinner
-      await load(true)
-    } catch (err: any) {
-      // Rollback optimistic update jika API gagal
-      toast.error(err?.detail ?? "Gagal memindah node")
-      await load()
-    } finally {
-      setIsSyncing(false)
-    }
-  }
+  // ── Derived ──────────────────────────────────────────────────────────────
+  const filtL2    = lvl2List.filter(l => l.lvl1_id === selL1)
+  const filtL3    = lvl3List.filter(l => l.lvl2_id === selL2)
+  const filtKat   = katalog.filter(k =>
+    (!selL1 || k.lvl1_id === selL1) && (!selL2 || k.lvl2_id === selL2)
+  )
+  const l2CountOf = (l1id: number) => lvl2List.filter(l => l.lvl1_id === l1id).length
+  const l3CountOf = (l2id: number) => lvl3List.filter(l => l.lvl2_id === l2id).length
 
   return (
-<OeeGuard section="master">
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50/30">
+    <OeeGuard section="master">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-teal-50/20">
+
+        {/* Hero */}
         <div className="relative overflow-hidden bg-gradient-to-r from-teal-800 to-cyan-600 px-8 py-10">
           <div className="absolute -top-8 -right-8 h-40 w-40 rounded-full bg-white/5" />
           <div className="relative flex items-center gap-4">
@@ -215,102 +365,219 @@ export default function MachineLossPage() {
             <div>
               <p className="text-white/60 text-xs font-semibold uppercase tracking-widest mb-1">Master Data</p>
               <h2 className="text-3xl font-bold text-white tracking-tight">Machine Losses</h2>
-              <p className="text-white/70 text-sm mt-1">Machine Losses</p>
+              <p className="text-white/70 text-sm mt-1">Kelola kategori, sub-kategori, dan detail kerugian mesin</p>
             </div>
           </div>
         </div>
 
         <div className="p-8 space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight text-emerald-900">Master Machine Losses</h1>
-              <p className="text-sm text-emerald-600 mt-1">
-                Saved to <code className="text-xs bg-muted px-1 py-0.5 rounded">loss_level_1/2/3</code> and
-                auto-synced to <code className="text-xs bg-muted px-1 py-0.5 rounded">machine_losses</code> via trigger.
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              {isSyncing && (
-                <span className="flex items-center gap-1.5 text-xs text-emerald-600">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  Menyimpan…
-                </span>
-              )}
-              <Button variant="outline" size="sm" onClick={() => load()} disabled={isLoading || isSyncing}>
-                <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
-                Refresh
-              </Button>
-              <Button size="sm" onClick={() => setAddingL1(true)} disabled={addingL1 || isSyncing}>
-                <Plus className="h-4 w-4 mr-2" /> Add Level 1
-              </Button>
-            </div>
-          </div>
 
-          <div className="flex flex-wrap items-center gap-3 text-xs text-emerald-600">
-            {[
-              { label: "L1", style: "bg-blue-100 text-blue-700 border-blue-200",          desc: "Loss Category" },
-              { label: "L2", style: "bg-violet-100 text-violet-700 border-violet-200",    desc: "Sub Category"  },
-              { label: "L3", style: "bg-emerald-100 text-emerald-700 border-emerald-200", desc: "Detail Loss"   },
-            ].map(({ label, style, desc }) => (
-              <span key={label} className="flex items-center gap-1">
-                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${style}`}>{label}</span>
-                {desc}
-              </span>
-            ))}
-          </div>
+          {isLoading ? (
+            <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-teal-600" /></div>
+          ) : (
+            <>
+              {/* ── 3-column level selector ── */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                Machine Loss Structure
-                {!isLoading && (
-                  <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">
-                    {countAll(tree)} items
-                  </Badge>
-                )}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {addingL1 && (
-                <div className="flex items-center gap-2 mb-3 p-2.5 rounded-md bg-emerald-50 border border-emerald-200">
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border bg-emerald-100 text-emerald-700 border-emerald-200 shrink-0">L1</span>
-                  <Input
-                    autoFocus
-                    placeholder="New Loss Category name..."
-                    value={newL1}
-                    onChange={e => setNewL1(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === "Enter") saveL1()
-                      if (e.key === "Escape") { setAddingL1(false); setNewL1("") }
-                    }}
-                    className="h-8 text-sm flex-1"
-                  />
-                  <Button size="sm" onClick={saveL1} disabled={savingL1 || !newL1.trim()}>
-                    {savingL1 ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => { setAddingL1(false); setNewL1("") }}>
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              )}
+                {/* L1 */}
+                <Card className="border-red-100 shadow-sm">
+                  <CardHeader className="pb-3 border-b border-red-50 bg-red-50/40 rounded-t-xl">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <span className="px-2 py-0.5 rounded bg-red-100 text-red-700 text-[10px] font-bold">L1</span>
+                      Loss Category
+                      <Badge className="ml-auto bg-red-100 text-red-800 hover:bg-red-100 text-[10px]">{lvl1List.length}</Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-3 space-y-1.5 max-h-72 overflow-y-auto">
+                    {lvl1List.length === 0
+                      ? <p className="text-xs text-center text-slate-400 py-4">Belum ada data</p>
+                      : lvl1List.map(l => (
+                        <LevelRow key={l.id} id={l.id} name={l.name}
+                          badgeColor="bg-red-100 text-red-700"
+                          selected={selL1 === l.id}
+                          onClick={() => { setSelL1(selL1 === l.id ? null : l.id); setSelL2(null) }}
+                          onEdit={editL1}
+                          onDelete={id => setDeleteTarget({ type: 'lvl1', id })}
+                          childCount={l2CountOf(l.id)}
+                        />
+                      ))
+                    }
+                    <AddRow onAdd={addL1} placeholder="Nama loss category…" />
+                  </CardContent>
+                </Card>
 
-              {isLoading ? (
-                <div className="flex justify-center py-16">
-                  <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
-                </div>
-              ) : (
-                <MachineLossTree
-                  nodes={tree}
-                  onAddChild={handleAddChild}
-                  onUpdate={handleUpdate}
-                  onDelete={handleDelete}
-                  onMove={handleMove}
-                />
-              )}
-            </CardContent>
-          </Card>
+                {/* L2 */}
+                <Card className={cn('border-violet-100 shadow-sm transition-opacity', !selL1 && 'opacity-50 pointer-events-none')}>
+                  <CardHeader className="pb-3 border-b border-violet-50 bg-violet-50/40 rounded-t-xl">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <span className="px-2 py-0.5 rounded bg-violet-100 text-violet-700 text-[10px] font-bold">L2</span>
+                      Sub Category
+                      {selL1 && <span className="text-[10px] text-violet-500 font-normal truncate max-w-[100px]">
+                        — {lvl1List.find(l => l.id === selL1)?.name}
+                      </span>}
+                      <Badge className="ml-auto bg-violet-100 text-violet-800 hover:bg-violet-100 text-[10px]">{filtL2.length}</Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-3 space-y-1.5 max-h-72 overflow-y-auto">
+                    {filtL2.length === 0
+                      ? <p className="text-xs text-center text-slate-400 py-4">{selL1 ? 'Belum ada sub-kategori' : 'Pilih L1 terlebih dahulu'}</p>
+                      : filtL2.map(l => (
+                        <LevelRow key={l.id} id={l.id} name={l.name}
+                          badgeColor="bg-violet-100 text-violet-700"
+                          selected={selL2 === l.id}
+                          onClick={() => setSelL2(selL2 === l.id ? null : l.id)}
+                          onEdit={editL2}
+                          onDelete={id => setDeleteTarget({ type: 'lvl2', id })}
+                          childCount={l3CountOf(l.id)}
+                        />
+                      ))
+                    }
+                    {selL1 && <AddRow onAdd={addL2} placeholder="Nama sub-kategori…" />}
+                  </CardContent>
+                </Card>
+
+                {/* L3 */}
+                <Card className={cn('border-emerald-100 shadow-sm transition-opacity', !selL2 && 'opacity-50 pointer-events-none')}>
+                  <CardHeader className="pb-3 border-b border-emerald-50 bg-emerald-50/40 rounded-t-xl">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[10px] font-bold">L3</span>
+                      Detail Loss
+                      {selL2 && <span className="text-[10px] text-emerald-600 font-normal truncate max-w-[100px]">
+                        — {lvl2List.find(l => l.id === selL2)?.name}
+                      </span>}
+                      <Badge className="ml-auto bg-emerald-100 text-emerald-800 hover:bg-emerald-100 text-[10px]">{filtL3.length}</Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-3 space-y-1.5 max-h-72 overflow-y-auto">
+                    {filtL3.length === 0
+                      ? <p className="text-xs text-center text-slate-400 py-4">{selL2 ? 'Belum ada detail loss' : 'Pilih L2 terlebih dahulu'}</p>
+                      : filtL3.map(l => (
+                        <LevelRow key={l.id} id={l.id} name={l.name}
+                          badgeColor="bg-emerald-100 text-emerald-700"
+                          onEdit={editL3}
+                          onDelete={id => setDeleteTarget({ type: 'lvl3', id })}
+                        />
+                      ))
+                    }
+                    {selL2 && <AddRow onAdd={addL3} placeholder="Nama detail loss…" />}
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* ── Katalog kombinasi ── */}
+              <Card className="border-slate-200 shadow-sm">
+                <CardHeader className="pb-3 border-b border-slate-100 bg-slate-50/60 rounded-t-xl">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <Layers className="h-4 w-4 text-teal-600" />
+                      Master Machine Losses
+                      <Badge className="bg-teal-100 text-teal-800 hover:bg-teal-100 text-[10px]">{filtKat.length}</Badge>
+                      {(selL1 || selL2) && (
+                        <span className="text-xs text-slate-400 font-normal">(difilter)</span>
+                      )}
+                    </CardTitle>
+                    <Button size="sm" className="bg-teal-600 hover:bg-teal-700 h-7 text-xs gap-1"
+                      onClick={() => setKatalogOpen(true)}>
+                      <Plus className="h-3.5 w-3.5" /> Tambah Kombinasi
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                  {filtKat.length === 0 ? (
+                    <div className="text-center py-10 text-sm text-slate-400">Belum ada kombinasi machine loss.</div>
+                  ) : (
+                    <div className="overflow-auto max-h-96">
+                      <table className="w-full text-sm border-collapse min-w-[600px]">
+                        <thead>
+                          <tr className="bg-slate-50 border-b border-slate-200">
+                            <th className="text-left px-4 py-3 text-xs font-semibold text-slate-600 w-10">#</th>
+                            <th className="text-left px-4 py-3 text-xs font-semibold text-slate-600 min-w-[160px]">
+                              <span className="flex items-center gap-1.5">
+                                <span className="px-1.5 py-0.5 rounded bg-red-100 text-red-700 text-[10px] font-bold">L1</span>
+                                Loss Category
+                              </span>
+                            </th>
+                            <th className="text-left px-4 py-3 text-xs font-semibold text-slate-600 min-w-[160px]">
+                              <span className="flex items-center gap-1.5">
+                                <span className="px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 text-[10px] font-bold">L2</span>
+                                Sub Category
+                              </span>
+                            </th>
+                            <th className="text-left px-4 py-3 text-xs font-semibold text-slate-600 min-w-[160px]">
+                              <span className="flex items-center gap-1.5">
+                                <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[10px] font-bold">L3</span>
+                                Detail Loss
+                              </span>
+                            </th>
+                            <th className="text-left px-4 py-3 text-xs font-semibold text-slate-600">Remarks</th>
+                            <th className="sticky right-0 bg-slate-50 text-center px-3 py-3 text-xs font-semibold text-slate-600 border-l border-slate-200 w-16">Aksi</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filtKat.map((k, i) => (
+                            <tr key={k.id} className={cn('border-b border-slate-100 hover:bg-teal-50 transition-colors', i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50')}>
+                              <td className="px-4 py-3 text-xs text-slate-400">{k.id}</td>
+                              <td className="px-4 py-3">
+                                <Badge className="bg-red-100 text-red-700 border border-red-200 hover:bg-red-100 text-xs font-medium">
+                                  {k.lvl1_name ?? '—'}
+                                </Badge>
+                              </td>
+                              <td className="px-4 py-3">
+                                {k.lvl2_name
+                                  ? <Badge className="bg-violet-100 text-violet-700 border border-violet-200 hover:bg-violet-100 text-xs font-medium">{k.lvl2_name}</Badge>
+                                  : <span className="text-slate-300 text-xs">—</span>}
+                              </td>
+                              <td className="px-4 py-3">
+                                {k.lvl3_name
+                                  ? <Badge className="bg-emerald-100 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 text-xs font-medium">{k.lvl3_name}</Badge>
+                                  : <span className="text-slate-300 text-xs">—</span>}
+                              </td>
+                              <td className="px-4 py-3 text-xs text-slate-500 max-w-[160px] truncate">
+                                {k.remarks || <span className="text-slate-300">—</span>}
+                              </td>
+                              <td className={cn('sticky right-0 border-l border-slate-200 px-3 py-2.5 text-center', i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50')}>
+                                <Button size="sm" variant="ghost"
+                                  className="h-7 w-7 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50"
+                                  onClick={() => setDeleteTarget({ type: 'katalog', id: k.id })}>
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </>
+          )}
         </div>
       </div>
+
+      {/* Dialogs */}
+      <KatalogDialog
+        open={katalogOpen}
+        onClose={() => setKatalogOpen(false)}
+        onSave={handleKatalogSave}
+        lvl1List={lvl1List} lvl2List={lvl2List} lvl3List={lvl3List}
+        isSaving={isSavingKatalog}
+      />
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+        title="Hapus Data"
+        description={
+          deleteTarget?.type === 'lvl1' ? 'Level 1 beserta semua sub-kategori akan dihapus. Lanjutkan?' :
+          deleteTarget?.type === 'lvl2' ? 'Level 2 beserta semua detail akan dihapus. Lanjutkan?' :
+          deleteTarget?.type === 'lvl3' ? 'Detail loss ini akan dihapus. Lanjutkan?' :
+          'Kombinasi machine loss ini akan dihapus. Lanjutkan?'
+        }
+        confirmText="Hapus"
+        isLoading={isDeleting}
+      />
     </OeeGuard>
   )
 }

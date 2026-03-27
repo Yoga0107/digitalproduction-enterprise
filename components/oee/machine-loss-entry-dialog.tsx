@@ -13,7 +13,7 @@ import {
 import {
   AlertCircle, Loader2, Wrench, Clock, Tag, CheckCircle2, AlertTriangle,
 } from 'lucide-react'
-import { ApiLine, ApiShift, ApiMachineLoss, ApiFeedCode } from '@/types/api'
+import { ApiLine, ApiShift, ApiMachineLossLvl1, ApiMachineLossLvl2, ApiMachineLossLvl3, ApiFeedCode } from '@/types/api'
 import { cn } from '@/lib/utils'
 import { calcDurationHours, fmtHours } from '@/lib/machine-loss-utils'
 
@@ -55,7 +55,9 @@ type Props = {
   lines:       ApiLine[]
   shifts:      ApiShift[]
   feedCodes:   ApiFeedCode[]
-  allLosses:   ApiMachineLoss[]
+  allLvl1:     ApiMachineLossLvl1[]
+  allLvl2:     ApiMachineLossLvl2[]
+  allLvl3:     ApiMachineLossLvl3[]
   onFormChange: (f: MachineLossFormState) => void
   onSave:      () => void
   onClose:     () => void
@@ -124,7 +126,7 @@ function Section({
 // ─── Component ────────────────────────────────────────────────────────────────
 export function MachineLossEntryDialog({
   open, isEditing, isSaving, form, formError,
-  lines, shifts, feedCodes, allLosses,
+  lines, shifts, feedCodes, allLvl1, allLvl2, allLvl3,
   onFormChange, onSave, onClose,
 }: Props) {
   const set = (patch: Partial<MachineLossFormState>) =>
@@ -132,19 +134,17 @@ export function MachineLossEntryDialog({
 
   // Step completion states
   const step1Done = !!(form.date && form.line_id && form.shift_id)
-  const step2Done = step1Done   // step 2 is always optional, just needs step 1 done to unlock
+  const step2Done = step1Done
   const step3Done = !!form.loss_l1_id
   const step4Done = !!(form.duration_hours && Number(form.duration_hours) > 0)
 
-  // Cascading loss options
-  const lossL1 = allLosses.filter(l => l.level === 1 && l.is_active)
-  const lossL2 = allLosses.filter(
-    l => l.level === 2 && l.is_active &&
-      (!form.loss_l1_id || l.parent_id === Number(form.loss_l1_id))
+  // Cascading loss options — sekarang dari tabel terpisah
+  const lossL1 = allLvl1.filter(l => l.is_active)
+  const lossL2 = allLvl2.filter(
+    l => l.is_active && (!form.loss_l1_id || l.lvl1_id === Number(form.loss_l1_id))
   )
-  const lossL3 = allLosses.filter(
-    l => l.level === 3 && l.is_active &&
-      (!form.loss_l2_id || l.parent_id === Number(form.loss_l2_id))
+  const lossL3 = allLvl3.filter(
+    l => l.is_active && (!form.loss_l2_id || l.lvl2_id === Number(form.loss_l2_id))
   )
 
   // Selected labels for breadcrumb

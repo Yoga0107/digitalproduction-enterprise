@@ -23,12 +23,9 @@ export interface ApiToken { access_token: string; token_type: string }
 export interface LoginResponse { access_token: string; token_type: string; user: ApiUser }
 export interface RegisterResponse { message: string; user: ApiUser }
 
-// ─── Machine Losses (tabel self-referencing, sumber kebenaran untuk master page) ─
-// Tabel ini disync dari loss_level_1/2/3 via trigger/manual
-export interface ApiMachineLoss {
+// ─── Machine Loss Level Tables (4-table ERD) ──────────────────────────────
+export interface ApiMachineLossLvl1 {
   id: number;
-  parent_id: number | null;
-  level: 1 | 2 | 3;
   name: string;
   description: string | null;
   sort_order: number;
@@ -37,23 +34,41 @@ export interface ApiMachineLoss {
   created_by_id: number | null;
 }
 
-// ─── Loss Level Master Tables (tabel input terpisah per level) ────────────
-export interface ApiLossLevel1 {
-  id: number; name: string; description: string | null;
-  sort_order: number; is_active: boolean;
-  created_at: string; created_by_id: number | null;
+export interface ApiMachineLossLvl2 {
+  id: number;
+  lvl1_id: number;
+  name: string;
+  description: string | null;
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+  created_by_id: number | null;
 }
 
-export interface ApiLossLevel2 {
-  id: number; level_1_id: number; name: string; description: string | null;
-  sort_order: number; is_active: boolean;
-  created_at: string; created_by_id: number | null;
+export interface ApiMachineLossLvl3 {
+  id: number;
+  lvl2_id: number;
+  name: string;
+  description: string | null;
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+  created_by_id: number | null;
 }
 
-export interface ApiLossLevel3 {
-  id: number; level_2_id: number; name: string; description: string | null;
-  sort_order: number; is_active: boolean;
-  created_at: string; created_by_id: number | null;
+export interface ApiMasterMachineLoss {
+  id: number;
+  lvl1_id: number;
+  lvl2_id: number | null;
+  lvl3_id: number | null;
+  remarks: string | null;
+  is_active: boolean;
+  created_at: string;
+  created_by_id: number | null;
+  // denormalized
+  lvl1_name: string | null;
+  lvl2_name: string | null;
+  lvl3_name: string | null;
 }
 
 // ─── Master Data ──────────────────────────────────────────────────────────

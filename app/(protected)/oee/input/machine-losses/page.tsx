@@ -27,8 +27,8 @@ import {
   updateMachineLossInput, deleteMachineLossInput,
   downloadMachineLossExcel, importMachineLossExcel,
 } from '@/services/inputService'
-import { getLines, getShifts, getMachineLosses, getFeedCodes } from '@/services/masterService'
-import { ApiMachineLossInput, ApiLine, ApiShift, ApiMachineLoss, ApiFeedCode } from '@/types/api'
+import { getLines, getShifts, getMachineLossLvl1, getMachineLossLvl2, getMachineLossLvl3, getFeedCodes } from '@/services/masterService'
+import { ApiMachineLossInput, ApiLine, ApiShift, ApiMachineLossLvl1, ApiMachineLossLvl2, ApiMachineLossLvl3, ApiFeedCode } from '@/types/api'
 import { fmtDate, fmtHours } from '@/lib/machine-loss-utils'
 
 // ─── Split record type ────────────────────────────────────────────────────────
@@ -162,7 +162,9 @@ function SplitShiftPreviewDialog({
   splits,
   form,
   shifts,
-  allLosses,
+  allLvl1,
+  allLvl2,
+  allLvl3,
   isSaving,
   onConfirm,
   onBack,
@@ -171,16 +173,18 @@ function SplitShiftPreviewDialog({
   splits:    SplitRecord[]
   form:      MachineLossFormState
   shifts:    ApiShift[]
-  allLosses: ApiMachineLoss[]
+  allLvl1:   ApiMachineLossLvl1[]
+  allLvl2:   ApiMachineLossLvl2[]
+  allLvl3:   ApiMachineLossLvl3[]
   isSaving:  boolean
   onConfirm: () => void
   onBack:    () => void
 }) {
   if (!open) return null
 
-  const l1 = allLosses.find(l => String(l.id) === form.loss_l1_id)
-  const l2 = allLosses.find(l => String(l.id) === form.loss_l2_id)
-  const l3 = allLosses.find(l => String(l.id) === form.loss_l3_id)
+  const l1 = allLvl1.find(l => String(l.id) === form.loss_l1_id)
+  const l2 = allLvl2.find(l => String(l.id) === form.loss_l2_id)
+  const l3 = allLvl3.find(l => String(l.id) === form.loss_l3_id)
   const totalMin = splits.reduce((s, r) => s + r.duration_minutes, 0)
 
   return (
@@ -299,7 +303,9 @@ export default function MachineLossInputPage() {
 
   const [lines, setLines]         = useState<ApiLine[]>([])
   const [shifts, setShifts]       = useState<ApiShift[]>([])
-  const [allLosses, setAllLosses] = useState<ApiMachineLoss[]>([])
+  const [allLvl1, setAllLvl1]     = useState<ApiMachineLossLvl1[]>([])
+  const [allLvl2, setAllLvl2]     = useState<ApiMachineLossLvl2[]>([])
+  const [allLvl3, setAllLvl3]     = useState<ApiMachineLossLvl3[]>([])
   const [feedCodes, setFeedCodes] = useState<ApiFeedCode[]>([])
 
   const [rows, setRows]           = useState<ApiMachineLossInput[]>([])
@@ -328,13 +334,16 @@ export default function MachineLossInputPage() {
   const load = useCallback(async () => {
     try {
       setIsLoading(true)
-      const [inputData, lineData, shiftData, lossData, fcData] = await Promise.all([
-        getMachineLossInputs(), getLines(), getShifts(), getMachineLosses(), getFeedCodes(),
+      const [inputData, lineData, shiftData, l1Data, l2Data, l3Data, fcData] = await Promise.all([
+        getMachineLossInputs(), getLines(), getShifts(),
+        getMachineLossLvl1(), getMachineLossLvl2(), getMachineLossLvl3(), getFeedCodes(),
       ])
       setRows(inputData)
       setLines(lineData.filter(l => l.is_active))
       setShifts(shiftData.filter(s => s.is_active))
-      setAllLosses(lossData.filter(l => l.is_active))
+      setAllLvl1(l1Data.filter(l => l.is_active))
+      setAllLvl2(l2Data.filter(l => l.is_active))
+      setAllLvl3(l3Data.filter(l => l.is_active))
       setFeedCodes(fcData.filter(f => f.is_active))
     } catch { toast.error('Gagal memuat data') }
     finally { setIsLoading(false) }
@@ -639,7 +648,8 @@ export default function MachineLossInputPage() {
       <MachineLossEntryDialog
         open={dialogOpen} isEditing={!!editing} isSaving={isSaving}
         form={form} formError={formError}
-        lines={lines} shifts={shifts} feedCodes={feedCodes} allLosses={allLosses}
+        lines={lines} shifts={shifts} feedCodes={feedCodes}
+        allLvl1={allLvl1} allLvl2={allLvl2} allLvl3={allLvl3}
         onFormChange={setForm} onSave={handleSave} onClose={() => setDialogOpen(false)}
       />
 
@@ -648,7 +658,9 @@ export default function MachineLossInputPage() {
         splits={splitPreview}
         form={pendingForm ?? form}
         shifts={shifts}
-        allLosses={allLosses}
+        allLvl1={allLvl1}
+        allLvl2={allLvl2}
+        allLvl3={allLvl3}
         isSaving={isSaving}
         onConfirm={() => commitSave(pendingForm ?? form, splitPreview)}
         onBack={() => { setSplitPreviewOpen(false); setDialogOpen(true) }}
