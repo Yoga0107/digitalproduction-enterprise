@@ -75,8 +75,8 @@ function Section({
   step:     number
   label:    string
   icon:     React.ElementType
-  locked:   boolean   // true = belum bisa diakses
-  done:     boolean   // true = sudah terisi lengkap
+  locked:   boolean
+  done:     boolean
   children: React.ReactNode
 }) {
   return (
@@ -88,12 +88,10 @@ function Section({
           ? 'bg-white border-emerald-200 shadow-sm'
           : 'bg-white border-slate-200 shadow-sm',
     )}>
-      {/* Section header */}
       <div className={cn(
         'flex items-center gap-3 px-4 py-3 rounded-t-xl',
         locked ? 'opacity-40' : '',
       )}>
-        {/* Step bubble */}
         <div className={cn(
           'h-7 w-7 rounded-full flex items-center justify-center shrink-0 text-xs font-bold transition-colors',
           done
@@ -113,7 +111,6 @@ function Section({
         </span>
       </div>
 
-      {/* Section body — hidden when locked */}
       {!locked && (
         <div className="px-4 pb-4 space-y-3">
           {children}
@@ -138,19 +135,17 @@ export function MachineLossEntryDialog({
   const step3Done = !!form.loss_l1_id
   const step4Done = !!(form.duration_hours && Number(form.duration_hours) > 0)
 
-  // Cascading loss options — sekarang dari tabel terpisah
-  const lossL1 = allLvl1.filter(l => l.is_active)
-  const lossL2 = allLvl2.filter(
-    l => l.is_active && (!form.loss_l1_id || l.lvl1_id === Number(form.loss_l1_id))
-  )
-  const lossL3 = allLvl3.filter(
-    l => l.is_active && (!form.loss_l2_id || l.lvl2_id === Number(form.loss_l2_id))
-  )
+  // ── PENTING: Backend Lvl2 & Lvl3 adalah tabel FLAT (tidak ada lvl1_id/lvl2_id).
+  // Untuk input machine loss, kita tampilkan SEMUA item L2/L3 tanpa filter cascade.
+  // Cascade filter hanya di master page (katalog kombinasi).
+  const lossL1 = allLvl1   // ApiMachineLossLvl1 — PK: machine_losses_lvl_1_id
+  const lossL2 = allLvl2   // ApiMachineLossLvl2 — PK: machine_losses_lvl_2_id (flat, no lvl1_id)
+  const lossL3 = allLvl3   // ApiMachineLossLvl3 — PK: machine_losses_lvl_3_id (flat, no lvl2_id)
 
-  // Selected labels for breadcrumb
-  const selL1 = lossL1.find(l => String(l.id) === form.loss_l1_id)
-  const selL2 = lossL2.find(l => String(l.id) === form.loss_l2_id)
-  const selL3 = lossL3.find(l => String(l.id) === form.loss_l3_id)
+  // Selected labels for breadcrumb — gunakan field PK yang benar
+  const selL1 = lossL1.find(l => String(l.machine_losses_lvl_1_id) === form.loss_l1_id)
+  const selL2 = lossL2.find(l => String(l.machine_losses_lvl_2_id) === form.loss_l2_id)
+  const selL3 = lossL3.find(l => String(l.machine_losses_lvl_3_id) === form.loss_l3_id)
 
   // Duration auto-compute
   const autoHours    = calcDurationHours(form.time_from, form.time_to)
@@ -162,11 +157,10 @@ export function MachineLossEntryDialog({
   const crossShiftWarning = (() => {
     if (!form.time_from || !form.time_to || !selectedShift) return null
     const toMin = (hhmm: string) => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m }
-    const fromMin   = toMin(form.time_from)
-    const endMin    = toMin(form.time_to)
-    const shiftEnd  = toMin(selectedShift.time_to)
-    // Handle time_to < time_from (overnight) or endMin > shiftEnd
-    const adjustedEnd = endMin <= fromMin ? endMin + 24 * 60 : endMin
+    const fromMin          = toMin(form.time_from)
+    const endMin           = toMin(form.time_to)
+    const shiftEnd         = toMin(selectedShift.time_to)
+    const adjustedEnd      = endMin <= fromMin ? endMin + 24 * 60 : endMin
     const adjustedShiftEnd = shiftEnd <= toMin(selectedShift.time_from) ? shiftEnd + 24 * 60 : shiftEnd
     if (adjustedEnd > adjustedShiftEnd) {
       const overMin = adjustedEnd - adjustedShiftEnd
@@ -313,7 +307,7 @@ export function MachineLossEntryDialog({
               </div>
             )}
 
-            {/* L1 */}
+            {/* L1 — gunakan machine_losses_lvl_1_id sebagai value */}
             <div className="space-y-1.5">
               <Label className="text-xs flex items-center gap-1.5">
                 <span className="px-1.5 py-0.5 rounded bg-red-100 text-red-700 text-[10px] font-bold">L1</span>
@@ -332,19 +326,24 @@ export function MachineLossEntryDialog({
                     <span className="text-muted-foreground italic">— Pilih —</span>
                   </SelectItem>
                   {lossL1.map(l => (
-                    <SelectItem key={l.id} value={String(l.id)}>{l.name}</SelectItem>
+                    <SelectItem
+                      key={l.machine_losses_lvl_1_id}
+                      value={String(l.machine_losses_lvl_1_id)}
+                    >
+                      {l.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
-            {/* L2 — hanya muncul setelah L1 dipilih */}
+            {/* L2 — tampil setelah L1 dipilih; gunakan machine_losses_lvl_2_id */}
             {form.loss_l1_id && (
               <div className="space-y-1.5">
                 <Label className="text-xs flex items-center gap-1.5">
                   <span className="px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 text-[10px] font-bold">L2</span>
                   Loss Level 2
-                  <span className="text-xs text-muted-foreground font-normal"></span>
+                  <span className="text-xs text-muted-foreground font-normal">(opsional)</span>
                 </Label>
                 <Select
                   value={form.loss_l2_id || 'none'}
@@ -359,20 +358,25 @@ export function MachineLossEntryDialog({
                       <span className="text-muted-foreground italic">— Tidak ada —</span>
                     </SelectItem>
                     {lossL2.map(l => (
-                      <SelectItem key={l.id} value={String(l.id)}>{l.name}</SelectItem>
+                      <SelectItem
+                        key={l.machine_losses_lvl_2_id}
+                        value={String(l.machine_losses_lvl_2_id)}
+                      >
+                        {l.name}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
             )}
 
-            {/* L3 — hanya muncul setelah L2 dipilih */}
+            {/* L3 — tampil setelah L2 dipilih; gunakan machine_losses_lvl_3_id */}
             {form.loss_l2_id && (
               <div className="space-y-1.5">
                 <Label className="text-xs flex items-center gap-1.5">
                   <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[10px] font-bold">L3</span>
                   Loss Level 3
-                  <span className="text-xs text-muted-foreground font-normal"></span>
+                  <span className="text-xs text-muted-foreground font-normal">(opsional)</span>
                 </Label>
                 <Select
                   value={form.loss_l3_id || 'none'}
@@ -387,7 +391,12 @@ export function MachineLossEntryDialog({
                       <span className="text-muted-foreground italic">— Tidak ada —</span>
                     </SelectItem>
                     {lossL3.map(l => (
-                      <SelectItem key={l.id} value={String(l.id)}>{l.name}</SelectItem>
+                      <SelectItem
+                        key={l.machine_losses_lvl_3_id}
+                        value={String(l.machine_losses_lvl_3_id)}
+                      >
+                        {l.name}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

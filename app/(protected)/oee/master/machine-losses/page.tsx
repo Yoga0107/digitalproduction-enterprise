@@ -158,28 +158,34 @@ function AddRow({ onAdd, placeholder }: { onAdd: (name: string) => Promise<void>
 }
 
 // ─── Katalog Dialog ────────────────────────────────────────────────────────────
+// CATATAN: Lvl2 & Lvl3 adalah tabel FLAT di backend.
+// Semua item dari semua level selalu ditampilkan — tidak difilter per parent.
+// Hierarki hanya ada di tabel master_machine_losses (kombinasi L1+L2+L3).
 function KatalogDialog({
   open, onClose, onSave,
   lvl1List, lvl2List, lvl3List,
   isSaving,
 }: {
   open: boolean; onClose: () => void
-  onSave: (lvl1_id: number, lvl2_id: number | null, lvl3_id: number | null) => Promise<void>
+  onSave: (lvl1_id: number, lvl2_id: number | null, lvl3_id: number | null, remarks?: string) => Promise<void>
   lvl1List: ApiMachineLossLvl1[]; lvl2List: ApiMachineLossLvl2[]; lvl3List: ApiMachineLossLvl3[]
   isSaving: boolean
 }) {
   const [selL1, setSelL1] = useState('')
   const [selL2, setSelL2] = useState('')
   const [selL3, setSelL3] = useState('')
+  const [remarks, setRemarks] = useState('')
 
-  const filtL2 = lvl2List.filter(l => l.lvl1_id === Number(selL1))
-  const filtL3 = lvl3List.filter(l => l.lvl2_id === Number(selL2))
-
-  function reset() { setSelL1(''); setSelL2(''); setSelL3('') }
+  function reset() { setSelL1(''); setSelL2(''); setSelL3(''); setRemarks('') }
 
   async function handleSave() {
     if (!selL1) return
-    await onSave(Number(selL1), selL2 ? Number(selL2) : null, selL3 ? Number(selL3) : null)
+    await onSave(
+      Number(selL1),
+      selL2 && selL2 !== 'none' ? Number(selL2) : null,
+      selL3 && selL3 !== 'none' ? Number(selL3) : null,
+      remarks.trim() || undefined,
+    )
     reset()
   }
 
@@ -193,6 +199,7 @@ function KatalogDialog({
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-3 py-1">
+          {/* L1 — wajib */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold flex items-center gap-1.5">
               <span className="px-1.5 py-0.5 rounded bg-red-100 text-red-700 text-[10px] font-bold">L1</span>
@@ -203,46 +210,67 @@ function KatalogDialog({
                 <SelectValue placeholder="Pilih L1…" />
               </SelectTrigger>
               <SelectContent>
-                {lvl1List.map(l => <SelectItem key={l.id} value={String(l.id)}>{l.name}</SelectItem>)}
+                {lvl1List.map(l => (
+                  <SelectItem key={l.machine_losses_lvl_1_id} value={String(l.machine_losses_lvl_1_id)}>
+                    {l.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
 
-          {selL1 && (
-            <div className="space-y-1.5 pl-3 border-l-2 border-red-100">
-              <label className="text-xs font-semibold flex items-center gap-1.5">
-                <span className="px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 text-[10px] font-bold">L2</span>
-                Sub Category
-              </label>
-              <Select value={selL2} onValueChange={v => { setSelL2(v); setSelL3('') }} disabled={filtL2.length === 0}>
-                <SelectTrigger className={cn(selL2 && 'border-violet-200 bg-violet-50/40')}>
-                  <SelectValue placeholder={filtL2.length === 0 ? 'Tidak ada sub-kategori' : 'Pilih L2 (opsional)…'} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none"><span className="text-muted-foreground italic">— Tidak ada —</span></SelectItem>
-                  {filtL2.map(l => <SelectItem key={l.id} value={String(l.id)}>{l.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+          {/* L2 — opsional, tampil semua (flat table) */}
+          <div className="space-y-1.5 pl-3 border-l-2 border-red-100">
+            <label className="text-xs font-semibold flex items-center gap-1.5">
+              <span className="px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 text-[10px] font-bold">L2</span>
+              Sub Category <span className="text-xs font-normal text-slate-400">(opsional)</span>
+            </label>
+            <Select value={selL2} onValueChange={v => { setSelL2(v); setSelL3('') }}>
+              <SelectTrigger className={cn(selL2 && selL2 !== 'none' && 'border-violet-200 bg-violet-50/40')}>
+                <SelectValue placeholder="Pilih L2 (opsional)…" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none"><span className="text-muted-foreground italic">— Tidak ada —</span></SelectItem>
+                {lvl2List.map(l => (
+                  <SelectItem key={l.machine_losses_lvl_2_id} value={String(l.machine_losses_lvl_2_id)}>
+                    {l.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-          {selL2 && selL2 !== 'none' && (
-            <div className="space-y-1.5 pl-6 border-l-2 border-violet-100">
-              <label className="text-xs font-semibold flex items-center gap-1.5">
-                <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[10px] font-bold">L3</span>
-                Detail Loss
-              </label>
-              <Select value={selL3} onValueChange={setSelL3} disabled={filtL3.length === 0}>
-                <SelectTrigger className={cn(selL3 && 'border-emerald-200 bg-emerald-50/40')}>
-                  <SelectValue placeholder={filtL3.length === 0 ? 'Tidak ada detail' : 'Pilih L3 (opsional)…'} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none"><span className="text-muted-foreground italic">— Tidak ada —</span></SelectItem>
-                  {filtL3.map(l => <SelectItem key={l.id} value={String(l.id)}>{l.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+          {/* L3 — opsional, tampil semua (flat table) */}
+          <div className="space-y-1.5 pl-6 border-l-2 border-violet-100">
+            <label className="text-xs font-semibold flex items-center gap-1.5">
+              <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[10px] font-bold">L3</span>
+              Detail Loss <span className="text-xs font-normal text-slate-400">(opsional)</span>
+            </label>
+            <Select value={selL3} onValueChange={setSelL3}>
+              <SelectTrigger className={cn(selL3 && selL3 !== 'none' && 'border-emerald-200 bg-emerald-50/40')}>
+                <SelectValue placeholder="Pilih L3 (opsional)…" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none"><span className="text-muted-foreground italic">— Tidak ada —</span></SelectItem>
+                {lvl3List.map(l => (
+                  <SelectItem key={l.machine_losses_lvl_3_id} value={String(l.machine_losses_lvl_3_id)}>
+                    {l.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Remarks */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-slate-600">Remarks <span className="font-normal text-slate-400">(opsional)</span></label>
+            <Input
+              value={remarks}
+              onChange={e => setRemarks(e.target.value)}
+              placeholder="Keterangan tambahan…"
+              className="h-8 text-sm"
+            />
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => { onClose(); reset() }}>Batal</Button>
@@ -264,8 +292,9 @@ export default function MachineLossPage() {
   const [katalog, setKatalog]   = useState<ApiMasterMachineLoss[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
-  const [selL1, setSelL1] = useState<number | null>(null)
-  const [selL2, setSelL2] = useState<number | null>(null)
+  // Filter katalog berdasarkan L1/L2 yang dipilih
+  const [filterL1, setFilterL1] = useState<number | null>(null)
+  const [filterL2, setFilterL2] = useState<number | null>(null)
 
   const [deleteTarget, setDeleteTarget] = useState<{ type: 'lvl1'|'lvl2'|'lvl3'|'katalog'; id: number } | null>(null)
   const [isDeleting, setIsDeleting]     = useState(false)
@@ -295,10 +324,9 @@ export default function MachineLossPage() {
     catch (e: any) { toast.error(e?.detail ?? 'Gagal memperbarui') }
   }
 
-  // ── L2 handlers ─────────────────────────────────────────────────────────
+  // ── L2 handlers (flat — tidak butuh lvl1_id) ─────────────────────────────
   async function addL2(name: string) {
-    if (!selL1) return
-    try { await createMachineLossLvl2({ lvl1_id: selL1, name }); await load(); toast.success('Level 2 ditambahkan') }
+    try { await createMachineLossLvl2({ name }); await load(); toast.success('Level 2 ditambahkan') }
     catch (e: any) { toast.error(e?.detail ?? 'Gagal menambahkan') }
   }
   async function editL2(id: number, name: string) {
@@ -306,10 +334,9 @@ export default function MachineLossPage() {
     catch (e: any) { toast.error(e?.detail ?? 'Gagal memperbarui') }
   }
 
-  // ── L3 handlers ─────────────────────────────────────────────────────────
+  // ── L3 handlers (flat — tidak butuh lvl2_id) ─────────────────────────────
   async function addL3(name: string) {
-    if (!selL2) return
-    try { await createMachineLossLvl3({ lvl2_id: selL2, name }); await load(); toast.success('Level 3 ditambahkan') }
+    try { await createMachineLossLvl3({ name }); await load(); toast.success('Level 3 ditambahkan') }
     catch (e: any) { toast.error(e?.detail ?? 'Gagal menambahkan') }
   }
   async function editL3(id: number, name: string) {
@@ -332,24 +359,47 @@ export default function MachineLossPage() {
   }
 
   // ── Katalog save ─────────────────────────────────────────────────────────
-  async function handleKatalogSave(lvl1_id: number, lvl2_id: number | null, lvl3_id: number | null) {
+  async function handleKatalogSave(
+    lvl1_id: number,
+    lvl2_id: number | null,
+    lvl3_id: number | null,
+    remarks?: string,
+  ) {
     setIsSavingKatalog(true)
     try {
-      await createMasterMachineLoss({ lvl1_id, lvl2_id, lvl3_id })
+      await createMasterMachineLoss({
+        machine_losses_lvl_1_id: lvl1_id,
+        machine_losses_lvl_2_id: lvl2_id,
+        machine_losses_lvl_3_id: lvl3_id,
+        remarks,
+      })
       toast.success('Kombinasi berhasil ditambahkan')
       setKatalogOpen(false); await load()
     } catch (e: any) { toast.error(e?.detail ?? 'Gagal menyimpan') }
     finally { setIsSavingKatalog(false) }
   }
 
-  // ── Derived ──────────────────────────────────────────────────────────────
-  const filtL2    = lvl2List.filter(l => l.lvl1_id === selL1)
-  const filtL3    = lvl3List.filter(l => l.lvl2_id === selL2)
-  const filtKat   = katalog.filter(k =>
-    (!selL1 || k.lvl1_id === selL1) && (!selL2 || k.lvl2_id === selL2)
+  // ── Derived — filter katalog berdasarkan pilihan L1/L2 ──────────────────
+  const filtKat = katalog.filter(k =>
+    (!filterL1 || k.machine_losses_lvl_1_id === filterL1) &&
+    (!filterL2 || k.machine_losses_lvl_2_id === filterL2)
   )
-  const l2CountOf = (l1id: number) => lvl2List.filter(l => l.lvl1_id === l1id).length
-  const l3CountOf = (l2id: number) => lvl3List.filter(l => l.lvl2_id === l2id).length
+  const getL1Name = (id: number | null) =>
+  lvl1List.find(l => l.machine_losses_lvl_1_id === id)?.name
+
+const getL2Name = (id: number | null) =>
+  lvl2List.find(l => l.machine_losses_lvl_2_id === id)?.name
+
+const getL3Name = (id: number | null) =>
+  lvl3List.find(l => l.machine_losses_lvl_3_id === id)?.name
+
+  // Hitung berapa kali setiap L1/L2/L3 dipakai di katalog (untuk badge)
+  const l1UsageCount = (l1id: number) =>
+    katalog.filter(k => k.machine_losses_lvl_1_id === l1id).length
+  const l2UsageCount = (l2id: number) =>
+    katalog.filter(k => k.machine_losses_lvl_2_id === l2id).length
+  const l3UsageCount = (l3id: number) =>
+    katalog.filter(k => k.machine_losses_lvl_3_id === l3id).length
 
   return (
     <OeeGuard section="master">
@@ -376,6 +426,15 @@ export default function MachineLossPage() {
             <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-teal-600" /></div>
           ) : (
             <>
+              {/* Info banner: struktur flat */}
+              <div className="rounded-lg border border-blue-200 bg-blue-50/60 px-4 py-3 text-xs text-blue-700 flex items-start gap-2">
+                <span className="font-bold mt-0.5">ℹ</span>
+                <span>
+                  <strong>L1, L2, L3</strong> adalah daftar mandiri (flat). Hubungan antar level dikelola di tabel <strong>Master Machine Losses</strong> sebagai kombinasi.
+                  Anda bisa menambah item di level mana pun secara independen.
+                </span>
+              </div>
+
               {/* ── 3-column level selector ── */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
@@ -392,13 +451,19 @@ export default function MachineLossPage() {
                     {lvl1List.length === 0
                       ? <p className="text-xs text-center text-slate-400 py-4">Belum ada data</p>
                       : lvl1List.map(l => (
-                        <LevelRow key={l.id} id={l.id} name={l.name}
+                        <LevelRow
+                          key={l.machine_losses_lvl_1_id}
+                          id={l.machine_losses_lvl_1_id}
+                          name={l.name}
                           badgeColor="bg-red-100 text-red-700"
-                          selected={selL1 === l.id}
-                          onClick={() => { setSelL1(selL1 === l.id ? null : l.id); setSelL2(null) }}
+                          selected={filterL1 === l.machine_losses_lvl_1_id}
+                          onClick={() => {
+                            setFilterL1(filterL1 === l.machine_losses_lvl_1_id ? null : l.machine_losses_lvl_1_id)
+                            setFilterL2(null)
+                          }}
                           onEdit={editL1}
                           onDelete={id => setDeleteTarget({ type: 'lvl1', id })}
-                          childCount={l2CountOf(l.id)}
+                          childCount={l1UsageCount(l.machine_losses_lvl_1_id)}
                         />
                       ))
                     }
@@ -406,60 +471,61 @@ export default function MachineLossPage() {
                   </CardContent>
                 </Card>
 
-                {/* L2 */}
-                <Card className={cn('border-violet-100 shadow-sm transition-opacity', !selL1 && 'opacity-50 pointer-events-none')}>
+                {/* L2 — flat, tidak tergantung L1 */}
+                <Card className="border-violet-100 shadow-sm">
                   <CardHeader className="pb-3 border-b border-violet-50 bg-violet-50/40 rounded-t-xl">
                     <CardTitle className="text-sm flex items-center gap-2">
                       <span className="px-2 py-0.5 rounded bg-violet-100 text-violet-700 text-[10px] font-bold">L2</span>
                       Sub Category
-                      {selL1 && <span className="text-[10px] text-violet-500 font-normal truncate max-w-[100px]">
-                        — {lvl1List.find(l => l.id === selL1)?.name}
-                      </span>}
-                      <Badge className="ml-auto bg-violet-100 text-violet-800 hover:bg-violet-100 text-[10px]">{filtL2.length}</Badge>
+                      <Badge className="ml-auto bg-violet-100 text-violet-800 hover:bg-violet-100 text-[10px]">{lvl2List.length}</Badge>
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-3 space-y-1.5 max-h-72 overflow-y-auto">
-                    {filtL2.length === 0
-                      ? <p className="text-xs text-center text-slate-400 py-4">{selL1 ? 'Belum ada sub-kategori' : 'Pilih L1 terlebih dahulu'}</p>
-                      : filtL2.map(l => (
-                        <LevelRow key={l.id} id={l.id} name={l.name}
+                    {lvl2List.length === 0
+                      ? <p className="text-xs text-center text-slate-400 py-4">Belum ada sub-kategori</p>
+                      : lvl2List.map(l => (
+                        <LevelRow
+                          key={l.machine_losses_lvl_2_id}
+                          id={l.machine_losses_lvl_2_id}
+                          name={l.name}
                           badgeColor="bg-violet-100 text-violet-700"
-                          selected={selL2 === l.id}
-                          onClick={() => setSelL2(selL2 === l.id ? null : l.id)}
+                          selected={filterL2 === l.machine_losses_lvl_2_id}
+                          onClick={() => setFilterL2(filterL2 === l.machine_losses_lvl_2_id ? null : l.machine_losses_lvl_2_id)}
                           onEdit={editL2}
                           onDelete={id => setDeleteTarget({ type: 'lvl2', id })}
-                          childCount={l3CountOf(l.id)}
+                          childCount={l2UsageCount(l.machine_losses_lvl_2_id)}
                         />
                       ))
                     }
-                    {selL1 && <AddRow onAdd={addL2} placeholder="Nama sub-kategori…" />}
+                    <AddRow onAdd={addL2} placeholder="Nama sub-kategori…" />
                   </CardContent>
                 </Card>
 
-                {/* L3 */}
-                <Card className={cn('border-emerald-100 shadow-sm transition-opacity', !selL2 && 'opacity-50 pointer-events-none')}>
+                {/* L3 — flat, tidak tergantung L2 */}
+                <Card className="border-emerald-100 shadow-sm">
                   <CardHeader className="pb-3 border-b border-emerald-50 bg-emerald-50/40 rounded-t-xl">
                     <CardTitle className="text-sm flex items-center gap-2">
                       <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[10px] font-bold">L3</span>
                       Detail Loss
-                      {selL2 && <span className="text-[10px] text-emerald-600 font-normal truncate max-w-[100px]">
-                        — {lvl2List.find(l => l.id === selL2)?.name}
-                      </span>}
-                      <Badge className="ml-auto bg-emerald-100 text-emerald-800 hover:bg-emerald-100 text-[10px]">{filtL3.length}</Badge>
+                      <Badge className="ml-auto bg-emerald-100 text-emerald-800 hover:bg-emerald-100 text-[10px]">{lvl3List.length}</Badge>
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-3 space-y-1.5 max-h-72 overflow-y-auto">
-                    {filtL3.length === 0
-                      ? <p className="text-xs text-center text-slate-400 py-4">{selL2 ? 'Belum ada detail loss' : 'Pilih L2 terlebih dahulu'}</p>
-                      : filtL3.map(l => (
-                        <LevelRow key={l.id} id={l.id} name={l.name}
+                    {lvl3List.length === 0
+                      ? <p className="text-xs text-center text-slate-400 py-4">Belum ada detail loss</p>
+                      : lvl3List.map(l => (
+                        <LevelRow
+                          key={l.machine_losses_lvl_3_id}
+                          id={l.machine_losses_lvl_3_id}
+                          name={l.name}
                           badgeColor="bg-emerald-100 text-emerald-700"
                           onEdit={editL3}
                           onDelete={id => setDeleteTarget({ type: 'lvl3', id })}
+                          childCount={l3UsageCount(l.machine_losses_lvl_3_id)}
                         />
                       ))
                     }
-                    {selL2 && <AddRow onAdd={addL3} placeholder="Nama detail loss…" />}
+                    <AddRow onAdd={addL3} placeholder="Nama detail loss…" />
                   </CardContent>
                 </Card>
               </div>
@@ -467,24 +533,53 @@ export default function MachineLossPage() {
               {/* ── Katalog kombinasi ── */}
               <Card className="border-slate-200 shadow-sm">
                 <CardHeader className="pb-3 border-b border-slate-100 bg-slate-50/60 rounded-t-xl">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
                     <CardTitle className="text-sm flex items-center gap-2">
                       <Layers className="h-4 w-4 text-teal-600" />
                       Master Machine Losses
                       <Badge className="bg-teal-100 text-teal-800 hover:bg-teal-100 text-[10px]">{filtKat.length}</Badge>
-                      {(selL1 || selL2) && (
+                      {(filterL1 || filterL2) && (
                         <span className="text-xs text-slate-400 font-normal">(difilter)</span>
                       )}
                     </CardTitle>
-                    <Button size="sm" className="bg-teal-600 hover:bg-teal-700 h-7 text-xs gap-1"
-                      onClick={() => setKatalogOpen(true)}>
-                      <Plus className="h-3.5 w-3.5" /> Tambah Kombinasi
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      {(filterL1 || filterL2) && (
+                        <Button size="sm" variant="ghost" className="h-7 text-xs text-slate-500 hover:text-slate-700"
+                          onClick={() => { setFilterL1(null); setFilterL2(null) }}>
+                          <X className="h-3 w-3 mr-1" /> Reset Filter
+                        </Button>
+                      )}
+                      <Button size="sm" className="bg-teal-600 hover:bg-teal-700 h-7 text-xs gap-1"
+                        onClick={() => setKatalogOpen(true)}>
+                        <Plus className="h-3.5 w-3.5" /> Tambah Kombinasi
+                      </Button>
+                    </div>
                   </div>
+                  {(filterL1 || filterL2) && (
+                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                      <span className="text-xs text-slate-500">Filter aktif:</span>
+                      {filterL1 && (
+                        <Badge className="bg-red-100 text-red-700 border border-red-200 text-xs gap-1 cursor-pointer hover:bg-red-200"
+                          onClick={() => setFilterL1(null)}>
+                          L1: {lvl1List.find(l => l.machine_losses_lvl_1_id === filterL1)?.name}
+                          <X className="h-2.5 w-2.5" />
+                        </Badge>
+                      )}
+                      {filterL2 && (
+                        <Badge className="bg-violet-100 text-violet-700 border border-violet-200 text-xs gap-1 cursor-pointer hover:bg-violet-200"
+                          onClick={() => setFilterL2(null)}>
+                          L2: {lvl2List.find(l => l.machine_losses_lvl_2_id === filterL2)?.name}
+                          <X className="h-2.5 w-2.5" />
+                        </Badge>
+                      )}
+                    </div>
+                  )}
                 </CardHeader>
                 <CardContent className="p-0">
                   {filtKat.length === 0 ? (
-                    <div className="text-center py-10 text-sm text-slate-400">Belum ada kombinasi machine loss.</div>
+                    <div className="text-center py-10 text-sm text-slate-400">
+                      {filterL1 || filterL2 ? 'Tidak ada kombinasi sesuai filter.' : 'Belum ada kombinasi machine loss.'}
+                    </div>
                   ) : (
                     <div className="overflow-auto max-h-96">
                       <table className="w-full text-sm border-collapse min-w-[600px]">
@@ -515,8 +610,8 @@ export default function MachineLossPage() {
                         </thead>
                         <tbody>
                           {filtKat.map((k, i) => (
-                            <tr key={k.id} className={cn('border-b border-slate-100 hover:bg-teal-50 transition-colors', i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50')}>
-                              <td className="px-4 py-3 text-xs text-slate-400">{k.id}</td>
+                            <tr key={k.machine_losses_id} className={cn('border-b border-slate-100 hover:bg-teal-50 transition-colors', i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50')}>
+                              <td className="px-4 py-3 text-xs text-slate-400">{k.machine_losses_id}</td>
                               <td className="px-4 py-3">
                                 <Badge className="bg-red-100 text-red-700 border border-red-200 hover:bg-red-100 text-xs font-medium">
                                   {k.lvl1_name ?? '—'}
@@ -538,7 +633,7 @@ export default function MachineLossPage() {
                               <td className={cn('sticky right-0 border-l border-slate-200 px-3 py-2.5 text-center', i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50')}>
                                 <Button size="sm" variant="ghost"
                                   className="h-7 w-7 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50"
-                                  onClick={() => setDeleteTarget({ type: 'katalog', id: k.id })}>
+                                  onClick={() => setDeleteTarget({ type: 'katalog', id: k.machine_losses_id })}>
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </Button>
                               </td>
@@ -570,9 +665,9 @@ export default function MachineLossPage() {
         onConfirm={handleDelete}
         title="Hapus Data"
         description={
-          deleteTarget?.type === 'lvl1' ? 'Level 1 beserta semua sub-kategori akan dihapus. Lanjutkan?' :
-          deleteTarget?.type === 'lvl2' ? 'Level 2 beserta semua detail akan dihapus. Lanjutkan?' :
-          deleteTarget?.type === 'lvl3' ? 'Detail loss ini akan dihapus. Lanjutkan?' :
+          deleteTarget?.type === 'lvl1' ? 'Loss Category ini akan dihapus. Pastikan tidak digunakan di Master Machine Losses. Lanjutkan?' :
+          deleteTarget?.type === 'lvl2' ? 'Sub Category ini akan dihapus. Pastikan tidak digunakan di Master Machine Losses. Lanjutkan?' :
+          deleteTarget?.type === 'lvl3' ? 'Detail Loss ini akan dihapus. Pastikan tidak digunakan di Master Machine Losses. Lanjutkan?' :
           'Kombinasi machine loss ini akan dihapus. Lanjutkan?'
         }
         confirmText="Hapus"

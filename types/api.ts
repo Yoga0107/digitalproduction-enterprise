@@ -24,48 +24,35 @@ export interface LoginResponse { access_token: string; token_type: string; user:
 export interface RegisterResponse { message: string; user: ApiUser }
 
 // ─── Machine Loss Level Tables (4-table ERD) ──────────────────────────────
+// NOTE: Backend menggunakan field ID khusus, bukan `id` generic.
+// Lvl1, Lvl2, Lvl3 adalah tabel FLAT — tidak ada FK antar level.
+// Hierarki dikelola di tabel master_machine_losses (katalog kombinasi).
+
 export interface ApiMachineLossLvl1 {
-  id: number;
+  machine_losses_lvl_1_id: number;  // PK dari backend
   name: string;
-  description: string | null;
-  sort_order: number;
-  is_active: boolean;
-  created_at: string;
-  created_by_id: number | null;
 }
 
 export interface ApiMachineLossLvl2 {
-  id: number;
-  lvl1_id: number;
+  machine_losses_lvl_2_id: number;  // PK dari backend
   name: string;
-  description: string | null;
-  sort_order: number;
-  is_active: boolean;
-  created_at: string;
-  created_by_id: number | null;
 }
 
 export interface ApiMachineLossLvl3 {
-  id: number;
-  lvl2_id: number;
+  machine_losses_lvl_3_id: number;  // PK dari backend
   name: string;
-  description: string | null;
-  sort_order: number;
-  is_active: boolean;
-  created_at: string;
-  created_by_id: number | null;
 }
 
 export interface ApiMasterMachineLoss {
-  id: number;
-  lvl1_id: number;
-  lvl2_id: number | null;
-  lvl3_id: number | null;
+  machine_losses_id: number;              // PK dari backend
+  machine_losses_lvl_1_id: number;
+  machine_losses_lvl_2_id: number | null;
+  machine_losses_lvl_3_id: number | null;
   remarks: string | null;
   is_active: boolean;
   created_at: string;
   created_by_id: number | null;
-  // denormalized
+  // denormalized names
   lvl1_name: string | null;
   lvl2_name: string | null;
   lvl3_name: string | null;

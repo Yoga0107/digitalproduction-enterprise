@@ -8,47 +8,72 @@ import {
 } from '@/types/api';
 
 // ─── Machine Loss Level 1 ──────────────────────────────────────────────────
+// Backend endpoint: /api/v1/master/machine-loss-lvl1
+// Response field: machine_losses_lvl_1_id (bukan `id`)
+// Tabel FLAT — hanya menyimpan name, tidak ada FK ke level lain
 export const getMachineLossLvl1 = () =>
   api.get<ApiMachineLossLvl1[]>('/api/v1/master/machine-loss-lvl1');
-export const createMachineLossLvl1 = (data: { name: string; description?: string; sort_order?: number }) =>
+export const createMachineLossLvl1 = (data: { name: string }) =>
   api.post<ApiMachineLossLvl1>('/api/v1/master/machine-loss-lvl1', data);
-export const updateMachineLossLvl1 = (id: number, data: Partial<{ name: string; description: string; sort_order: number; is_active: boolean }>) =>
+export const updateMachineLossLvl1 = (id: number, data: { name?: string }) =>
   api.put<ApiMachineLossLvl1>(`/api/v1/master/machine-loss-lvl1/${id}`, data);
 export const deleteMachineLossLvl1 = (id: number) =>
   api.delete(`/api/v1/master/machine-loss-lvl1/${id}`);
 
 // ─── Machine Loss Level 2 ──────────────────────────────────────────────────
-export const getMachineLossLvl2 = (lvl1_id?: number) =>
-  api.get<ApiMachineLossLvl2[]>(`/api/v1/master/machine-loss-lvl2${lvl1_id ? `?lvl1_id=${lvl1_id}` : ''}`);
-export const createMachineLossLvl2 = (data: { lvl1_id: number; name: string; description?: string; sort_order?: number }) =>
+// Backend endpoint: /api/v1/master/machine-loss-lvl2
+// Response field: machine_losses_lvl_2_id (bukan `id`)
+// Tabel FLAT — TIDAK ada lvl1_id; hierarki dikelola di master_machine_losses
+export const getMachineLossLvl2 = () =>
+  api.get<ApiMachineLossLvl2[]>('/api/v1/master/machine-loss-lvl2');
+export const createMachineLossLvl2 = (data: { name: string }) =>
   api.post<ApiMachineLossLvl2>('/api/v1/master/machine-loss-lvl2', data);
-export const updateMachineLossLvl2 = (id: number, data: Partial<{ name: string; description: string; sort_order: number; is_active: boolean }>) =>
+export const updateMachineLossLvl2 = (id: number, data: { name?: string }) =>
   api.put<ApiMachineLossLvl2>(`/api/v1/master/machine-loss-lvl2/${id}`, data);
 export const deleteMachineLossLvl2 = (id: number) =>
   api.delete(`/api/v1/master/machine-loss-lvl2/${id}`);
 
 // ─── Machine Loss Level 3 ──────────────────────────────────────────────────
-export const getMachineLossLvl3 = (lvl2_id?: number) =>
-  api.get<ApiMachineLossLvl3[]>(`/api/v1/master/machine-loss-lvl3${lvl2_id ? `?lvl2_id=${lvl2_id}` : ''}`);
-export const createMachineLossLvl3 = (data: { lvl2_id: number; name: string; description?: string; sort_order?: number }) =>
+// Backend endpoint: /api/v1/master/machine-loss-lvl3
+// Response field: machine_losses_lvl_3_id (bukan `id`)
+// Tabel FLAT — TIDAK ada lvl2_id; hierarki dikelola di master_machine_losses
+export const getMachineLossLvl3 = () =>
+  api.get<ApiMachineLossLvl3[]>('/api/v1/master/machine-loss-lvl3');
+export const createMachineLossLvl3 = (data: { name: string }) =>
   api.post<ApiMachineLossLvl3>('/api/v1/master/machine-loss-lvl3', data);
-export const updateMachineLossLvl3 = (id: number, data: Partial<{ name: string; description: string; sort_order: number; is_active: boolean }>) =>
+export const updateMachineLossLvl3 = (id: number, data: { name?: string }) =>
   api.put<ApiMachineLossLvl3>(`/api/v1/master/machine-loss-lvl3/${id}`, data);
 export const deleteMachineLossLvl3 = (id: number) =>
   api.delete(`/api/v1/master/machine-loss-lvl3/${id}`);
 
 // ─── Master Machine Losses (katalog kombinasi) ─────────────────────────────
-export const getMasterMachineLosses = (params?: { lvl1_id?: number; lvl2_id?: number }) => {
+// Backend endpoint: /api/v1/master/master-machine-losses
+// Response field: machine_losses_id (bukan `id`)
+// Query params: machine_losses_lvl_1_id, machine_losses_lvl_2_id
+// Payload create: machine_losses_lvl_1_id (required), machine_losses_lvl_2_id, machine_losses_lvl_3_id
+export const getMasterMachineLosses = (params?: {
+  machine_losses_lvl_1_id?: number;
+  machine_losses_lvl_2_id?: number;
+}) => {
   const q = new URLSearchParams();
-  if (params?.lvl1_id) q.set('lvl1_id', String(params.lvl1_id));
-  if (params?.lvl2_id) q.set('lvl2_id', String(params.lvl2_id));
+  if (params?.machine_losses_lvl_1_id) q.set('machine_losses_lvl_1_id', String(params.machine_losses_lvl_1_id));
+  if (params?.machine_losses_lvl_2_id) q.set('machine_losses_lvl_2_id', String(params.machine_losses_lvl_2_id));
   const qs = q.toString();
   return api.get<ApiMasterMachineLoss[]>(`/api/v1/master/master-machine-losses${qs ? '?' + qs : ''}`);
 };
-export const createMasterMachineLoss = (data: { lvl1_id: number; lvl2_id?: number | null; lvl3_id?: number | null; remarks?: string }) =>
-  api.post<ApiMasterMachineLoss>('/api/v1/master/master-machine-losses', data);
-export const updateMasterMachineLoss = (id: number, data: Partial<{ lvl1_id: number; lvl2_id: number | null; lvl3_id: number | null; remarks: string; is_active: boolean }>) =>
-  api.put<ApiMasterMachineLoss>(`/api/v1/master/master-machine-losses/${id}`, data);
+export const createMasterMachineLoss = (data: {
+  machine_losses_lvl_1_id: number;
+  machine_losses_lvl_2_id?: number | null;
+  machine_losses_lvl_3_id?: number | null;
+  remarks?: string;
+}) => api.post<ApiMasterMachineLoss>('/api/v1/master/master-machine-losses', data);
+export const updateMasterMachineLoss = (id: number, data: Partial<{
+  machine_losses_lvl_1_id: number;
+  machine_losses_lvl_2_id: number | null;
+  machine_losses_lvl_3_id: number | null;
+  remarks: string;
+  is_active: boolean;
+}>) => api.put<ApiMasterMachineLoss>(`/api/v1/master/master-machine-losses/${id}`, data);
 export const deleteMasterMachineLoss = (id: number) =>
   api.delete(`/api/v1/master/master-machine-losses/${id}`);
 
