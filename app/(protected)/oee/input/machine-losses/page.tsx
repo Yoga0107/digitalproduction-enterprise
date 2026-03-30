@@ -27,8 +27,8 @@ import {
   updateMachineLossInput, deleteMachineLossInput,
   downloadMachineLossExcel, importMachineLossExcel,
 } from '@/services/inputService'
-import { getLines, getShifts, getMachineLossLvl1, getMachineLossLvl2, getMachineLossLvl3, getFeedCodes } from '@/services/masterService'
-import { ApiMachineLossInput, ApiLine, ApiShift, ApiMachineLossLvl1, ApiMachineLossLvl2, ApiMachineLossLvl3, ApiFeedCode } from '@/types/api'
+import { getLines, getShifts, getMachineLossLvl1, getMachineLossLvl2, getMachineLossLvl3, getFeedCodes, getMasterMachineLosses } from '@/services/masterService'
+import { ApiMachineLossInput, ApiLine, ApiShift, ApiMachineLossLvl1, ApiMachineLossLvl2, ApiMachineLossLvl3, ApiFeedCode, ApiMasterMachineLoss } from '@/types/api'
 import { fmtDate, fmtHours } from '@/lib/machine-loss-utils'
 
 // ─── Split record type ────────────────────────────────────────────────────────
@@ -182,9 +182,9 @@ function SplitShiftPreviewDialog({
 }) {
   if (!open) return null
 
-  const l1 = allLvl1.find(l => String(l.id) === form.loss_l1_id)
-  const l2 = allLvl2.find(l => String(l.id) === form.loss_l2_id)
-  const l3 = allLvl3.find(l => String(l.id) === form.loss_l3_id)
+  const l1 = allLvl1.find(l => String(l.machine_losses_lvl_1_id) === form.loss_l1_id)
+  const l2 = allLvl2.find(l => String(l.machine_losses_lvl_2_id) === form.loss_l2_id)
+  const l3 = allLvl3.find(l => String(l.machine_losses_lvl_3_id) === form.loss_l3_id)
   const totalMin = splits.reduce((s, r) => s + r.duration_minutes, 0)
 
   return (
@@ -306,6 +306,7 @@ export default function MachineLossInputPage() {
   const [allLvl1, setAllLvl1]     = useState<ApiMachineLossLvl1[]>([])
   const [allLvl2, setAllLvl2]     = useState<ApiMachineLossLvl2[]>([])
   const [allLvl3, setAllLvl3]     = useState<ApiMachineLossLvl3[]>([])
+  const [masterLosses, setMasterLosses] = useState<ApiMasterMachineLoss[]>([])
   const [feedCodes, setFeedCodes] = useState<ApiFeedCode[]>([])
 
   const [rows, setRows]           = useState<ApiMachineLossInput[]>([])
@@ -334,16 +335,18 @@ export default function MachineLossInputPage() {
   const load = useCallback(async () => {
     try {
       setIsLoading(true)
-      const [inputData, lineData, shiftData, l1Data, l2Data, l3Data, fcData] = await Promise.all([
+      const [inputData, lineData, shiftData, l1Data, l2Data, l3Data, fcData, masterData] = await Promise.all([
         getMachineLossInputs(), getLines(), getShifts(),
         getMachineLossLvl1(), getMachineLossLvl2(), getMachineLossLvl3(), getFeedCodes(),
+        getMasterMachineLosses(),
       ])
       setRows(inputData)
       setLines(lineData.filter(l => l.is_active))
       setShifts(shiftData.filter(s => s.is_active))
-      setAllLvl1(l1Data.filter(l => l.is_active))
-      setAllLvl2(l2Data.filter(l => l.is_active))
-      setAllLvl3(l3Data.filter(l => l.is_active))
+      setAllLvl1(l1Data)
+      setAllLvl2(l2Data)
+      setAllLvl3(l3Data)
+      setMasterLosses(masterData)
       setFeedCodes(fcData.filter(f => f.is_active))
     } catch { toast.error('Gagal memuat data') }
     finally { setIsLoading(false) }
@@ -362,7 +365,7 @@ export default function MachineLossInputPage() {
       loss_l2_id: row.loss_l2_id ? String(row.loss_l2_id) : '',
       loss_l3_id: row.loss_l3_id ? String(row.loss_l3_id) : '',
       time_from: row.time_from ?? '', time_to: row.time_to ?? '',
-      duration_hours: String(row.duration_minutes), remarks: row.remarks ?? '',
+      duration_hours: String(parseFloat((row.duration_minutes / 60).toFixed(4))), remarks: row.remarks ?? '',
     })
     setFormError(''); setDialogOpen(true)
   }
@@ -400,7 +403,8 @@ export default function MachineLossInputPage() {
 
   async function commitSave(f: MachineLossFormState, splits: SplitRecord[] | null) {
     setIsSaving(true)
-    const dur = Number(f.duration_hours)
+    const durHours = Number(f.duration_hours)
+    const durMinutes = Math.round(durHours * 60)  // convert jam → menit
     const basePayload = {
       date: new Date(f.date).toISOString(),
       line_id:      Number(f.line_id),
@@ -417,7 +421,7 @@ export default function MachineLossInputPage() {
           shift_id: Number(f.shift_id),
           time_from: f.time_from || null,
           time_to:   f.time_to   || null,
-          duration_minutes: dur,
+          duration_minutes: durMinutes,
         }
         const u = await updateMachineLossInput(editing.id, payload)
         setRows(prev => prev.map(r => r.id === editing.id ? u : r))
@@ -443,7 +447,7 @@ export default function MachineLossInputPage() {
           shift_id: Number(f.shift_id),
           time_from: f.time_from || null,
           time_to:   f.time_to   || null,
-          duration_minutes: dur,
+          duration_minutes: durMinutes,
         }
         const c = await createMachineLossInput(payload)
         setRows(prev => [c, ...prev])
@@ -472,7 +476,7 @@ export default function MachineLossInputPage() {
   ): SplitRecord[] {
     const timeFrom = f.time_from
     const timeTo   = f.time_to
-    const dur      = Number(f.duration_hours)
+    const dur      = Math.round(Number(f.duration_hours) * 60)  // jam → menit
 
     if (!timeFrom || !timeTo || !selectedShift) {
       return [{
@@ -579,6 +583,36 @@ export default function MachineLossInputPage() {
     return true
   })
 
+  // ── Cascade filter L2/L3 berdasarkan masterLosses (katalog kombinasi) ──────
+  // Hanya tampilkan L2 yang memiliki kombinasi valid dengan L1 yang dipilih
+  const filteredLvl2: ApiMachineLossLvl2[] = (() => {
+    if (!form.loss_l1_id) return []
+    const l1id = Number(form.loss_l1_id)
+    const validL2Ids = new Set(
+      masterLosses
+        .filter(m => m.machine_losses_lvl_1_id === l1id && m.machine_losses_lvl_2_id != null)
+        .map(m => m.machine_losses_lvl_2_id!)
+    )
+    return allLvl2.filter(l => validL2Ids.has(l.machine_losses_lvl_2_id))
+  })()
+
+  // Hanya tampilkan L3 yang memiliki kombinasi valid dengan L1+L2 yang dipilih
+  const filteredLvl3: ApiMachineLossLvl3[] = (() => {
+    if (!form.loss_l1_id || !form.loss_l2_id) return []
+    const l1id = Number(form.loss_l1_id)
+    const l2id = Number(form.loss_l2_id)
+    const validL3Ids = new Set(
+      masterLosses
+        .filter(m =>
+          m.machine_losses_lvl_1_id === l1id &&
+          m.machine_losses_lvl_2_id === l2id &&
+          m.machine_losses_lvl_3_id != null
+        )
+        .map(m => m.machine_losses_lvl_3_id!)
+    )
+    return allLvl3.filter(l => validL3Ids.has(l.machine_losses_lvl_3_id))
+  })()
+
   const totalMinutes = filtered.reduce((s, r) => s + r.duration_minutes, 0)
   const avgMinutes   = filtered.length > 0 ? totalMinutes / filtered.length : 0
   const byL1: Record<string, number> = {}
@@ -649,7 +683,7 @@ export default function MachineLossInputPage() {
         open={dialogOpen} isEditing={!!editing} isSaving={isSaving}
         form={form} formError={formError}
         lines={lines} shifts={shifts} feedCodes={feedCodes}
-        allLvl1={allLvl1} allLvl2={allLvl2} allLvl3={allLvl3}
+        allLvl1={allLvl1} allLvl2={filteredLvl2} allLvl3={filteredLvl3}
         onFormChange={setForm} onSave={handleSave} onClose={() => setDialogOpen(false)}
       />
 

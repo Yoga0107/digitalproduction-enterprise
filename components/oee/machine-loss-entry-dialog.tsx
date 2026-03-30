@@ -12,12 +12,12 @@ import {
 } from '@/components/ui/select'
 import {
   AlertCircle, Loader2, Wrench, Clock, Tag, CheckCircle2, AlertTriangle,
+  ChevronRight, X,
 } from 'lucide-react'
 import { ApiLine, ApiShift, ApiMachineLossLvl1, ApiMachineLossLvl2, ApiMachineLossLvl3, ApiFeedCode } from '@/types/api'
 import { cn } from '@/lib/utils'
 import { calcDurationHours, fmtHours } from '@/lib/machine-loss-utils'
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 export type MachineLossFormState = {
   date:           string
   line_id:        string
@@ -64,41 +64,19 @@ type Props = {
 }
 
 // ─── Section wrapper ──────────────────────────────────────────────────────────
-function Section({
-  step,
-  label,
-  icon: Icon,
-  locked,
-  done,
-  children,
-}: {
-  step:     number
-  label:    string
-  icon:     React.ElementType
-  locked:   boolean
-  done:     boolean
-  children: React.ReactNode
+function Section({ step, label, icon: Icon, locked, done, children }: {
+  step: number; label: string; icon: React.ElementType
+  locked: boolean; done: boolean; children: React.ReactNode
 }) {
   return (
     <div className={cn(
       'rounded-xl border transition-all duration-200',
-      locked
-        ? 'bg-slate-50 border-slate-100'
-        : done
-          ? 'bg-white border-emerald-200 shadow-sm'
-          : 'bg-white border-slate-200 shadow-sm',
+      locked ? 'bg-slate-50 border-slate-100' : done ? 'bg-white border-emerald-200 shadow-sm' : 'bg-white border-slate-200 shadow-sm',
     )}>
-      <div className={cn(
-        'flex items-center gap-3 px-4 py-3 rounded-t-xl',
-        locked ? 'opacity-40' : '',
-      )}>
+      <div className={cn('flex items-center gap-3 px-4 py-3 rounded-t-xl', locked ? 'opacity-40' : '')}>
         <div className={cn(
           'h-7 w-7 rounded-full flex items-center justify-center shrink-0 text-xs font-bold transition-colors',
-          done
-            ? 'bg-emerald-500 text-white'
-            : locked
-              ? 'bg-slate-200 text-slate-400'
-              : 'bg-slate-800 text-white',
+          done ? 'bg-emerald-500 text-white' : locked ? 'bg-slate-200 text-slate-400' : 'bg-slate-800 text-white',
         )}>
           {done ? <CheckCircle2 className="h-4 w-4" /> : step}
         </div>
@@ -106,53 +84,124 @@ function Section({
         <span className={cn(
           'text-xs font-semibold uppercase tracking-widest',
           locked ? 'text-slate-300' : done ? 'text-emerald-700' : 'text-slate-600',
-        )}>
-          {label}
-        </span>
+        )}>{label}</span>
       </div>
-
-      {!locked && (
-        <div className="px-4 pb-4 space-y-3">
-          {children}
-        </div>
-      )}
+      {!locked && <div className="px-4 pb-4 space-y-3">{children}</div>}
     </div>
   )
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
+// ─── LossPicker: card-grid selector ──────────────────────────────────────────
+function LossPicker<T extends { name: string }>({
+  items, selectedId, onSelect, onClear, getId,
+  colorScheme, placeholder, emptyText,
+}: {
+  items: T[]
+  selectedId: string
+  onSelect: (id: string) => void
+  onClear: () => void
+  getId: (item: T) => number
+  colorScheme: 'red' | 'violet' | 'emerald'
+  placeholder: string
+  emptyText: string
+}) {
+  const c = {
+    red: {
+      selected: 'border-red-300 bg-red-50 text-red-800 ring-2 ring-red-300 ring-offset-1',
+      hover: 'hover:border-red-200 hover:bg-red-50/60 hover:text-red-700',
+      chip: 'bg-red-100 text-red-700 border-red-200',
+      dot: 'bg-red-500',
+      clear: 'hover:bg-red-200/60',
+    },
+    violet: {
+      selected: 'border-violet-300 bg-violet-50 text-violet-800 ring-2 ring-violet-300 ring-offset-1',
+      hover: 'hover:border-violet-200 hover:bg-violet-50/60 hover:text-violet-700',
+      chip: 'bg-violet-100 text-violet-700 border-violet-200',
+      dot: 'bg-violet-500',
+      clear: 'hover:bg-violet-200/60',
+    },
+    emerald: {
+      selected: 'border-emerald-300 bg-emerald-50 text-emerald-800 ring-2 ring-emerald-300 ring-offset-1',
+      hover: 'hover:border-emerald-200 hover:bg-emerald-50/60 hover:text-emerald-700',
+      chip: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+      dot: 'bg-emerald-500',
+      clear: 'hover:bg-emerald-200/60',
+    },
+  }[colorScheme]
+
+  if (items.length === 0) {
+    return <p className="text-xs text-slate-400 italic py-1.5 text-center">{emptyText}</p>
+  }
+
+  return (
+    <div className="space-y-2">
+      {/* Selected chip */}
+      {selectedId && (
+        <div className={cn('flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs font-semibold', c.chip)}>
+          <span className={cn('h-1.5 w-1.5 rounded-full shrink-0', c.dot)} />
+          <span className="flex-1 truncate">
+            {items.find(i => String(getId(i)) === selectedId)?.name ?? '—'}
+          </span>
+          <button
+            type="button"
+            onClick={onClear}
+            className={cn('rounded-full p-0.5 transition-colors', c.clear)}
+            title="Hapus pilihan"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        </div>
+      )}
+
+      {/* Card grid */}
+      {!selectedId && (
+        <p className="text-[11px] text-slate-400 font-medium">{placeholder}</p>
+      )}
+      <div className="grid grid-cols-2 gap-1.5 max-h-44 overflow-y-auto">
+        {items.map(item => {
+          const id = String(getId(item))
+          const isSelected = selectedId === id
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => isSelected ? onClear() : onSelect(id)}
+              className={cn(
+                'text-left rounded-lg border px-2.5 py-2 text-xs font-medium transition-all duration-150 leading-snug',
+                isSelected
+                  ? c.selected
+                  : cn('border-slate-200 bg-white text-slate-600', c.hover),
+              )}
+            >
+              <span className="line-clamp-2">{item.name}</span>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ─── Main Dialog ──────────────────────────────────────────────────────────────
 export function MachineLossEntryDialog({
   open, isEditing, isSaving, form, formError,
   lines, shifts, feedCodes, allLvl1, allLvl2, allLvl3,
   onFormChange, onSave, onClose,
 }: Props) {
-  const set = (patch: Partial<MachineLossFormState>) =>
-    onFormChange({ ...form, ...patch })
+  const set = (patch: Partial<MachineLossFormState>) => onFormChange({ ...form, ...patch })
 
-  // Step completion states
   const step1Done = !!(form.date && form.line_id && form.shift_id)
-  const step2Done = step1Done
   const step3Done = !!form.loss_l1_id
   const step4Done = !!(form.duration_hours && Number(form.duration_hours) > 0)
 
-  // ── PENTING: Backend Lvl2 & Lvl3 adalah tabel FLAT (tidak ada lvl1_id/lvl2_id).
-  // Untuk input machine loss, kita tampilkan SEMUA item L2/L3 tanpa filter cascade.
-  // Cascade filter hanya di master page (katalog kombinasi).
-  const lossL1 = allLvl1   // ApiMachineLossLvl1 — PK: machine_losses_lvl_1_id
-  const lossL2 = allLvl2   // ApiMachineLossLvl2 — PK: machine_losses_lvl_2_id (flat, no lvl1_id)
-  const lossL3 = allLvl3   // ApiMachineLossLvl3 — PK: machine_losses_lvl_3_id (flat, no lvl2_id)
+  const selL1 = allLvl1.find(l => String(l.machine_losses_lvl_1_id) === form.loss_l1_id)
+  const selL2 = allLvl2.find(l => String(l.machine_losses_lvl_2_id) === form.loss_l2_id)
+  const selL3 = allLvl3.find(l => String(l.machine_losses_lvl_3_id) === form.loss_l3_id)
 
-  // Selected labels for breadcrumb — gunakan field PK yang benar
-  const selL1 = lossL1.find(l => String(l.machine_losses_lvl_1_id) === form.loss_l1_id)
-  const selL2 = lossL2.find(l => String(l.machine_losses_lvl_2_id) === form.loss_l2_id)
-  const selL3 = lossL3.find(l => String(l.machine_losses_lvl_3_id) === form.loss_l3_id)
-
-  // Duration auto-compute
   const autoHours    = calcDurationHours(form.time_from, form.time_to)
   const hasAutoHours = !!(form.time_from && form.time_to && autoHours > 0)
   const displayHours = hasAutoHours ? autoHours : (Number(form.duration_hours) || 0)
 
-  // ── Cross-shift detection ─────────────────────────────────────────────────
   const selectedShift = shifts.find(s => String(s.id) === form.shift_id)
   const crossShiftWarning = (() => {
     if (!form.time_from || !form.time_to || !selectedShift) return null
@@ -160,21 +209,18 @@ export function MachineLossEntryDialog({
     const fromMin          = toMin(form.time_from)
     const endMin           = toMin(form.time_to)
     const shiftEnd         = toMin(selectedShift.time_to)
-    const adjustedEnd      = endMin <= fromMin ? endMin + 24 * 60 : endMin
-    const adjustedShiftEnd = shiftEnd <= toMin(selectedShift.time_from) ? shiftEnd + 24 * 60 : shiftEnd
-    if (adjustedEnd > adjustedShiftEnd) {
-      const overMin = adjustedEnd - adjustedShiftEnd
-      return `Downtime melewati batas shift (${selectedShift.time_to}) sejauh ${fmtHours(overMin)}. Data akan otomatis disimpan dalam ${Math.min(shifts.length, 2)} record terpisah.`
+    const adjEnd           = endMin   <= fromMin                        ? endMin   + 24 * 60 : endMin
+    const adjShiftEnd      = shiftEnd <= toMin(selectedShift.time_from) ? shiftEnd + 24 * 60 : shiftEnd
+    if (adjEnd > adjShiftEnd) {
+      const over = adjEnd - adjShiftEnd
+      return `Downtime melewati batas shift (${selectedShift.time_to}) sejauh ${fmtHours(over)}. Data akan otomatis disimpan dalam ${Math.min(shifts.length, 2)} record terpisah.`
     }
     return null
   })()
 
-  function handleL1Change(val: string) {
-    set({ loss_l1_id: val === 'none' ? '' : val, loss_l2_id: '', loss_l3_id: '' })
-  }
-  function handleL2Change(val: string) {
-    set({ loss_l2_id: val === 'none' ? '' : val, loss_l3_id: '' })
-  }
+  function handleL1Change(id: string) { set({ loss_l1_id: id, loss_l2_id: '', loss_l3_id: '' }) }
+  function handleL2Change(id: string) { set({ loss_l2_id: id, loss_l3_id: '' }) }
+  function handleL3Change(id: string) { set({ loss_l3_id: id }) }
   function handleTimeChange(field: 'time_from' | 'time_to', val: string) {
     const from = field === 'time_from' ? val : form.time_from
     const to   = field === 'time_to'   ? val : form.time_to
@@ -184,7 +230,7 @@ export function MachineLossEntryDialog({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[560px] max-h-[92vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[580px] max-h-[92vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Wrench className="h-5 w-5 text-teal-600" />
@@ -194,47 +240,29 @@ export function MachineLossEntryDialog({
 
         <div className="space-y-2.5 py-1">
 
-          {/* ── STEP 1: Konteks ── */}
-          <Section
-            step={1}
-            label="Tanggal, Shift & Line"
-            icon={Wrench}
-            locked={false}
-            done={step1Done}
-          >
+          {/* STEP 1 */}
+          <Section step={1} label="Tanggal, Shift & Line" icon={Wrench} locked={false} done={step1Done}>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-xs">
-                  Tanggal <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  type="date"
-                  value={form.date}
-                  onChange={e => set({ date: e.target.value })}
-                />
+                <Label className="text-xs">Tanggal <span className="text-destructive">*</span></Label>
+                <Input type="date" value={form.date} onChange={e => set({ date: e.target.value })} />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs">
-                  Shift <span className="text-destructive">*</span>
-                </Label>
+                <Label className="text-xs">Shift <span className="text-destructive">*</span></Label>
                 <Select value={form.shift_id} onValueChange={v => set({ shift_id: v })}>
                   <SelectTrigger><SelectValue placeholder="Pilih shift…" /></SelectTrigger>
                   <SelectContent>
                     {shifts.map(s => (
                       <SelectItem key={s.id} value={String(s.id)}>
                         <span className="font-medium">{s.name}</span>
-                        <span className="ml-2 text-xs text-muted-foreground">
-                          {s.time_from} – {s.time_to}
-                        </span>
+                        <span className="ml-2 text-xs text-muted-foreground">{s.time_from} – {s.time_to}</span>
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-1.5 col-span-2">
-                <Label className="text-xs">
-                  Line <span className="text-destructive">*</span>
-                </Label>
+                <Label className="text-xs">Line <span className="text-destructive">*</span></Label>
                 <Select value={form.line_id} onValueChange={v => set({ line_id: v })}>
                   <SelectTrigger><SelectValue placeholder="Pilih line…" /></SelectTrigger>
                   <SelectContent>
@@ -249,185 +277,122 @@ export function MachineLossEntryDialog({
             </div>
           </Section>
 
-          {/* ── STEP 2: Kode Pakan (opsional) ── */}
-          <Section
-            step={2}
-            label="Kode Pakan"
-            icon={Tag}
-            locked={!step1Done}
-            done={step1Done && !!form.feed_code_id}
-          >
-            <Select
-              value={form.feed_code_id || 'none'}
-              onValueChange={v => set({ feed_code_id: v === 'none' ? '' : v })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Pilih kode pakan…" />
-              </SelectTrigger>
+          {/* STEP 2 */}
+          <Section step={2} label="Kode Pakan" icon={Tag} locked={!step1Done} done={step1Done && !!form.feed_code_id}>
+            <Select value={form.feed_code_id || 'none'} onValueChange={v => set({ feed_code_id: v === 'none' ? '' : v })}>
+              <SelectTrigger><SelectValue placeholder="Pilih kode pakan…" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">
-                  <span className="text-muted-foreground italic">— Tidak ada —</span>
-                </SelectItem>
+                <SelectItem value="none"><span className="text-muted-foreground italic">— Tidak ada —</span></SelectItem>
                 {feedCodes.map(fc => (
                   <SelectItem key={fc.id} value={String(fc.id)}>
                     <span className="font-mono font-medium">{fc.code}</span>
-                    {fc.remarks && (
-                      <span className="ml-2 text-xs text-muted-foreground">{fc.remarks}</span>
-                    )}
+                    {fc.remarks && <span className="ml-2 text-xs text-muted-foreground">{fc.remarks}</span>}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </Section>
 
-          {/* ── STEP 3: Kategori Kerugian ── */}
-          <Section
-            step={3}
-            label="Machine Loss Category"
-            icon={Wrench}
-            locked={!step2Done}
-            done={step3Done}
-          >
-            {/* Breadcrumb preview */}
+          {/* STEP 3 — Enhanced Loss Category Picker */}
+          <Section step={3} label="Machine Loss Category" icon={Wrench} locked={!step1Done} done={step3Done}>
+
+            {/* Breadcrumb trail */}
             {selL1 && (
-              <div className="flex items-center gap-1.5 text-xs bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 flex-wrap">
-                <span className="font-semibold text-red-600">{selL1.name}</span>
+              <div className="flex items-center gap-1.5 flex-wrap rounded-lg bg-slate-50 border border-slate-100 px-3 py-2">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-red-100 text-red-700 text-xs font-semibold border border-red-200">
+                  <span className="text-[9px] font-bold opacity-50">L1</span>{selL1.name}
+                </span>
                 {selL2 && (
                   <>
-                    <span className="text-slate-300">›</span>
-                    <span className="font-semibold text-violet-600">{selL2.name}</span>
+                    <ChevronRight className="h-3.5 w-3.5 text-slate-300 shrink-0" />
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-violet-100 text-violet-700 text-xs font-semibold border border-violet-200">
+                      <span className="text-[9px] font-bold opacity-50">L2</span>{selL2.name}
+                    </span>
                   </>
                 )}
                 {selL3 && (
                   <>
-                    <span className="text-slate-300">›</span>
-                    <span className="font-semibold text-emerald-600">{selL3.name}</span>
+                    <ChevronRight className="h-3.5 w-3.5 text-slate-300 shrink-0" />
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-700 text-xs font-semibold border border-emerald-200">
+                      <span className="text-[9px] font-bold opacity-50">L3</span>{selL3.name}
+                    </span>
                   </>
                 )}
               </div>
             )}
 
-            {/* L1 — gunakan machine_losses_lvl_1_id sebagai value */}
+            {/* L1 */}
             <div className="space-y-1.5">
-              <Label className="text-xs flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5">
                 <span className="px-1.5 py-0.5 rounded bg-red-100 text-red-700 text-[10px] font-bold">L1</span>
-                Loss Level 1
-                <span className="text-destructive">*</span>
-              </Label>
-              <Select
-                value={form.loss_l1_id || 'none'}
-                onValueChange={handleL1Change}
-              >
-                <SelectTrigger className={cn(form.loss_l1_id && 'border-red-200 bg-red-50/40')}>
-                  <SelectValue placeholder="Pilih kategori utama…" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">
-                    <span className="text-muted-foreground italic">— Pilih —</span>
-                  </SelectItem>
-                  {lossL1.map(l => (
-                    <SelectItem
-                      key={l.machine_losses_lvl_1_id}
-                      value={String(l.machine_losses_lvl_1_id)}
-                    >
-                      {l.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                <span className="text-xs font-semibold text-slate-600">Loss Category</span>
+                <span className="text-destructive text-xs ml-0.5">*</span>
+              </div>
+              <LossPicker
+                items={allLvl1}
+                selectedId={form.loss_l1_id}
+                onSelect={handleL1Change}
+                onClear={() => handleL1Change('')}
+                getId={l => l.machine_losses_lvl_1_id}
+                colorScheme="red"
+                placeholder="Pilih kategori utama kerugian:"
+                emptyText="Belum ada Loss Category. Tambahkan di Master."
+              />
             </div>
 
-            {/* L2 — tampil setelah L1 dipilih; gunakan machine_losses_lvl_2_id */}
+            {/* L2 */}
             {form.loss_l1_id && (
-              <div className="space-y-1.5">
-                <Label className="text-xs flex items-center gap-1.5">
+              <div className="space-y-1.5 pl-3 border-l-2 border-red-100 ml-1">
+                <div className="flex items-center gap-1.5">
                   <span className="px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 text-[10px] font-bold">L2</span>
-                  Loss Level 2
-                  <span className="text-xs text-muted-foreground font-normal">(opsional)</span>
-                </Label>
-                <Select
-                  value={form.loss_l2_id || 'none'}
-                  onValueChange={handleL2Change}
-                  disabled={lossL2.length === 0}
-                >
-                  <SelectTrigger className={cn(form.loss_l2_id && 'border-violet-200 bg-violet-50/40')}>
-                    <SelectValue placeholder={lossL2.length === 0 ? 'Tidak ada sub-kategori' : 'Pilih sub-kategori…'} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">
-                      <span className="text-muted-foreground italic">— Tidak ada —</span>
-                    </SelectItem>
-                    {lossL2.map(l => (
-                      <SelectItem
-                        key={l.machine_losses_lvl_2_id}
-                        value={String(l.machine_losses_lvl_2_id)}
-                      >
-                        {l.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  <span className="text-xs font-semibold text-slate-600">Sub Category</span>
+                  <span className="text-[11px] text-muted-foreground">(opsional)</span>
+                </div>
+                <LossPicker
+                  items={allLvl2}
+                  selectedId={form.loss_l2_id}
+                  onSelect={handleL2Change}
+                  onClear={() => handleL2Change('')}
+                  getId={l => l.machine_losses_lvl_2_id}
+                  colorScheme="violet"
+                  placeholder="Pilih sub-kategori:"
+                  emptyText="Tidak ada sub-kategori untuk kategori ini."
+                />
               </div>
             )}
 
-            {/* L3 — tampil setelah L2 dipilih; gunakan machine_losses_lvl_3_id */}
+            {/* L3 */}
             {form.loss_l2_id && (
-              <div className="space-y-1.5">
-                <Label className="text-xs flex items-center gap-1.5">
+              <div className="space-y-1.5 pl-6 border-l-2 border-violet-100 ml-1">
+                <div className="flex items-center gap-1.5">
                   <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[10px] font-bold">L3</span>
-                  Loss Level 3
-                  <span className="text-xs text-muted-foreground font-normal">(opsional)</span>
-                </Label>
-                <Select
-                  value={form.loss_l3_id || 'none'}
-                  onValueChange={v => set({ loss_l3_id: v === 'none' ? '' : v })}
-                  disabled={lossL3.length === 0}
-                >
-                  <SelectTrigger className={cn(form.loss_l3_id && 'border-emerald-200 bg-emerald-50/40')}>
-                    <SelectValue placeholder={lossL3.length === 0 ? 'Tidak ada detail' : 'Pilih detail…'} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">
-                      <span className="text-muted-foreground italic">— Tidak ada —</span>
-                    </SelectItem>
-                    {lossL3.map(l => (
-                      <SelectItem
-                        key={l.machine_losses_lvl_3_id}
-                        value={String(l.machine_losses_lvl_3_id)}
-                      >
-                        {l.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  <span className="text-xs font-semibold text-slate-600">Detail Loss</span>
+                  <span className="text-[11px] text-muted-foreground">(opsional)</span>
+                </div>
+                <LossPicker
+                  items={allLvl3}
+                  selectedId={form.loss_l3_id}
+                  onSelect={handleL3Change}
+                  onClear={() => handleL3Change('')}
+                  getId={l => l.machine_losses_lvl_3_id}
+                  colorScheme="emerald"
+                  placeholder="Pilih detail kerugian:"
+                  emptyText="Tidak ada detail kerugian untuk sub-kategori ini."
+                />
               </div>
             )}
           </Section>
 
-          {/* ── STEP 4: Waktu & Durasi ── */}
-          <Section
-            step={4}
-            label="Waktu & Durasi"
-            icon={Clock}
-            locked={!step3Done}
-            done={step4Done}
-          >
+          {/* STEP 4 */}
+          <Section step={4} label="Waktu & Durasi" icon={Clock} locked={!step3Done} done={step4Done}>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs">Waktu Mulai</Label>
-                <Input
-                  type="time"
-                  value={form.time_from}
-                  onChange={e => handleTimeChange('time_from', e.target.value)}
-                />
+                <Input type="time" value={form.time_from} onChange={e => handleTimeChange('time_from', e.target.value)} />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Waktu Selesai</Label>
-                <Input
-                  type="time"
-                  value={form.time_to}
-                  onChange={e => handleTimeChange('time_to', e.target.value)}
-                />
+                <Input type="time" value={form.time_to} onChange={e => handleTimeChange('time_to', e.target.value)} />
               </div>
             </div>
 
@@ -435,16 +400,12 @@ export function MachineLossEntryDialog({
               <Label className="text-xs flex items-center gap-1.5">
                 Durasi (jam) <span className="text-destructive">*</span>
                 {hasAutoHours && (
-                  <span className="text-[10px] text-muted-foreground bg-slate-100 px-1.5 py-0.5 rounded font-normal">
-                    dihitung otomatis
-                  </span>
+                  <span className="text-[10px] text-muted-foreground bg-slate-100 px-1.5 py-0.5 rounded font-normal">dihitung otomatis</span>
                 )}
               </Label>
               <div className="relative">
                 <Input
-                  type="number"
-                  step="0.01"
-                  min="0.01"
+                  type="number" step="0.01" min="0.01"
                   placeholder="Contoh: 1.5"
                   value={hasAutoHours ? String(autoHours) : form.duration_hours}
                   onChange={e => !hasAutoHours && set({ duration_hours: e.target.value })}
@@ -461,7 +422,6 @@ export function MachineLossEntryDialog({
               </div>
             </div>
 
-            {/* ── Cross-shift warning ── */}
             {crossShiftWarning && (
               <div className="flex items-start gap-2.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5">
                 <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
@@ -474,12 +434,7 @@ export function MachineLossEntryDialog({
 
             <div className="space-y-1.5">
               <Label className="text-xs">Keterangan</Label>
-              <Textarea
-                placeholder="Catatan opsional…"
-                rows={2}
-                value={form.remarks}
-                onChange={e => set({ remarks: e.target.value })}
-              />
+              <Textarea placeholder="Catatan opsional…" rows={2} value={form.remarks} onChange={e => set({ remarks: e.target.value })} />
             </div>
           </Section>
         </div>
