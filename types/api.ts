@@ -20,7 +20,19 @@ export interface ApiPlant {
 }
 
 export interface ApiToken { access_token: string; token_type: string }
-export interface LoginResponse { access_token: string; token_type: string; user: ApiUser }
+
+export interface LoginToken {
+  access_token: string
+  refresh_token: string
+  token_type: string
+}
+
+export interface LoginResponse {
+  token: LoginToken
+  user: ApiUser
+  accessible_plants: ApiPlant[]
+}
+
 export interface RegisterResponse { message: string; user: ApiUser }
 
 // ─── Machine Loss Level Tables (4-table ERD) ──────────────────────────────

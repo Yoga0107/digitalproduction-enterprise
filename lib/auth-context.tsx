@@ -126,7 +126,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Auto-select plant: restore last used, or auto-select if only one
     const savedPlantId = localStorage.getItem('active_plant_id');
-    const previousPlant = plants.find((p) => p.id === Number(savedPlantId));
+    const previousPlant = plants.find((p: Plant) => p.id === Number(savedPlantId));
 
     if (previousPlant) {
       setActivePlant(previousPlant);
