@@ -68,7 +68,7 @@ export const menuItems: MenuItem[] = [
       { title: 'Availability Rate',    href: '/oee/view/availability-rate',     roles: OEE_VIEW_ROLES,   group: 'Data View' },
       { title: 'Performance Rate',     href: '/oee/view/performance-rate',      roles: OEE_VIEW_ROLES,   group: 'Data View' },
       { title: 'Quality Rate',         href: '/oee/view/quality-rate',          roles: OEE_VIEW_ROLES,   group: 'Data View' },
-      { title: 'Summary OEE',          href: '/oee/view/summary',               roles: OEE_VIEW_ROLES,   group: 'Data View' },
+      { title: 'Summary OEE',          href: '/oee/view/summary-oee',               roles: OEE_VIEW_ROLES,   group: 'Data View' },
     ],
   },
 

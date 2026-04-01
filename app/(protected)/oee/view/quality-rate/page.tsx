@@ -3,10 +3,7 @@
 import { OeeGuard } from '@/components/oee/oee-guard'
 import { useState, useMemo } from "react"
 
-import { Clock } from "lucide-react"
-import { Timer } from "lucide-react"
-import { BarChart2 } from "lucide-react"
-import { TrendingUp } from "lucide-react"
+import { LineChart } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
@@ -56,7 +53,6 @@ export default function QualityRatePage() {
   }, [data, fromDate, toDate, month])
 
   async function exportExcel() {
-
     if (!exportStart || !exportEnd) {
       alert("Please select start date and end date")
       return
@@ -78,7 +74,6 @@ export default function QualityRatePage() {
       { header: "All Line", key: "allLine", width: 14 }
     ]
 
-    // Header style
     sheet.getRow(1).eachCell(cell => {
       cell.font = { bold: true, color: { argb: "FFFFFFFF" } }
       cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F4E78" } }
@@ -96,11 +91,9 @@ export default function QualityRatePage() {
         line6: r.line6,
         allLine: r.allLine
       })
-
       row.eachCell(cell => { cell.alignment = { horizontal: "center" } })
     })
 
-    // Conditional color
     sheet.eachRow((row, rowNumber) => {
       if (rowNumber === 1) return
       row.eachCell((cell, colNumber) => {
@@ -122,9 +115,8 @@ export default function QualityRatePage() {
     setExportOpen(false)
   }
 
-  
-
-<OeeGuard section="view">
+  return (
+    <OeeGuard section="view">
       <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50/30">
         {/* HERO */}
         <div className="relative overflow-hidden bg-gradient-to-r from-teal-800 via-teal-700 to-cyan-600 px-8 py-10">
@@ -141,61 +133,56 @@ export default function QualityRatePage() {
           </div>
         </div>
         <div className="p-8 space-y-6">
-      
 
-      <Card>
-        <CardHeader><CardTitle className="text-emerald-900 flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-emerald-500 inline-block"/>Filter</CardTitle></CardHeader>
-        <CardContent className="flex flex-wrap items-end gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-emerald-900 flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-emerald-500 inline-block" />Filter
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-wrap items-end gap-6">
+              <div className="flex flex-col">
+                <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide">From Date</p>
+                <Input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} />
+              </div>
+              <div className="flex flex-col">
+                <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide">To Date</p>
+                <Input type="date" value={toDate} onChange={e => setToDate(e.target.value)} />
+              </div>
+              <div className="flex flex-col">
+                <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide">Monthly</p>
+                <Input type="month" value={month} onChange={e => setMonth(e.target.value)} />
+              </div>
+              <Button onClick={() => setExportOpen(true)} className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-sm gap-2">
+                📊 Export Excel
+              </Button>
+            </CardContent>
+          </Card>
 
-          <div className="flex flex-col">
-            <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide">From Date</p>
-            <Input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} />
-          </div>
+          <QualityRateTable data={filteredData} />
 
-          <div className="flex flex-col">
-            <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide">To Date</p>
-            <Input type="date" value={toDate} onChange={e => setToDate(e.target.value)} />
-          </div>
-
-          <div className="flex flex-col">
-            <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide">Monthly</p>
-            <Input type="month" value={month} onChange={e => setMonth(e.target.value)} />
-          </div>
-
-          <Button onClick={() => setExportOpen(true)} className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-sm gap-2">📊 Export Excel</Button>
-
-        </CardContent>
-      </Card>
-
-      <QualityRateTable data={filteredData} />
-
-      {/* Export Dialog */}
-      <Dialog open={exportOpen} onOpenChange={setExportOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Export Quality Rate</DialogTitle></DialogHeader>
-
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col">
-              <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide">Start Date</p>
-              <Input type="date" value={exportStart} onChange={e => setExportStart(e.target.value)} />
-            </div>
-
-            <div className="flex flex-col">
-              <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide">End Date</p>
-              <Input type="date" value={exportEnd} onChange={e => setExportEnd(e.target.value)} />
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setExportOpen(false)}>Cancel</Button>
-            <Button onClick={exportExcel}>Export</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          <Dialog open={exportOpen} onOpenChange={setExportOpen}>
+            <DialogContent>
+              <DialogHeader><DialogTitle>Export Quality Rate</DialogTitle></DialogHeader>
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col">
+                  <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide">Start Date</p>
+                  <Input type="date" value={exportStart} onChange={e => setExportStart(e.target.value)} />
+                </div>
+                <div className="flex flex-col">
+                  <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide">End Date</p>
+                  <Input type="date" value={exportEnd} onChange={e => setExportEnd(e.target.value)} />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setExportOpen(false)}>Cancel</Button>
+                <Button onClick={exportExcel}>Export</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
         </div>
       </div>
     </OeeGuard>
   )
-
 }
