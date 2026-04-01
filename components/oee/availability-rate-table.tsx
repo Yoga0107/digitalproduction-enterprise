@@ -1,6 +1,8 @@
 "use client"
 
-import { AvailabilityRow } from "@/app/oee/view/availability-rate/data"
+import { AvailabilityRow } from "@/app/(protected)/oee/view/availability-rate/data"
+
+
 
 
 
