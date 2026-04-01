@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { OeeGuard } from '@/components/oee/oee-guard'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -140,7 +139,7 @@ function OutputDetailDialog({
             </div>
           </div>
           {row.remarks && (
-            <div className="rounded-lg border bg-slate-50 px-3 py-2.5">
+            <div className="rounded-lg border bg-slate-50 px-4 py-3 space-y-1">
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
                 <FileText className="h-3 w-3" />Remarks
               </div>
@@ -150,7 +149,7 @@ function OutputDetailDialog({
         </div>
         <DialogFooter className="gap-2">
           <Button variant="outline" onClick={onClose}>Tutup</Button>
-          <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={() => onEdit(row)}>
+          <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={() => { onClose(); onEdit(row) }}>
             <Pencil className="h-4 w-4 mr-2" />Edit
           </Button>
         </DialogFooter>
@@ -177,23 +176,21 @@ export default function OutputPage() {
   const [formError, setFormError]   = useState('')
   const [viewRow, setViewRow]       = useState<ApiProductionOutput | null>(null)
 
-  // ── Filters (shared antara summary & bytype) ──
   const [filterDate, setFilterDate]   = useState('')
   const [filterLine, setFilterLine]   = useState('all')
   const [filterShift, setFilterShift] = useState('all')
-  const [filterType, setFilterType]   = useState('all')   // untuk tab bytype
+  const [filterType, setFilterType]   = useState('all')
   const [activeTab, setActiveTab]     = useState<'summary' | 'bytype'>('summary')
 
   const [deleteId, setDeleteId]       = useState<string | null>(null)
   const [isDeleting, setIsDeleting]   = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
 
-  // ── By-type data — di-load ulang setiap filter berubah saat tab aktif ──
   const [outputByType, setOutputByType]       = useState<ApiProductionOutputItem[]>([])
   const [isLoadingByType, setIsLoadingByType] = useState(false)
 
   const liveActual = computeActual(form.quantities)
 
-  // ── Initial load ──
   const load = useCallback(async () => {
     try {
       setIsLoading(true)
@@ -213,7 +210,6 @@ export default function OutputPage() {
     finally { setIsLoading(false) }
   }, [])
 
-  // ── Load by-type — dipanggil ulang tiap filter berubah jika tab aktif ──
   const loadByType = useCallback(async (
     date?: string, lineId?: string, shiftId?: string, outType?: string
   ) => {
@@ -233,7 +229,6 @@ export default function OutputPage() {
 
   useEffect(() => { load() }, [load])
 
-  // Re-load by-type saat filter berubah dan tab bytype aktif
   useEffect(() => {
     if (activeTab === 'bytype') {
       loadByType(filterDate, filterLine, filterShift, filterType)
@@ -310,7 +305,6 @@ export default function OutputPage() {
         setRows(prev => [c, ...prev])
         toast.success('Data berhasil disimpan')
       }
-      // refresh bytype jika tab aktif
       if (activeTab === 'bytype') {
         loadByType(filterDate, filterLine, filterShift, filterType)
       }
@@ -334,17 +328,20 @@ export default function OutputPage() {
     finally { setIsDeleting(false) }
   }
 
-  // ── Export: kirim filter aktif ──
   async function handleExport(): Promise<void> {
-    await downloadProductionOutputsExcel({
-      date_from: filterDate || undefined,
-      date_to:   filterDate || undefined,
-      line_id:   (filterLine  !== 'all') ? Number(filterLine)  : undefined,
-      shift_id:  (filterShift !== 'all') ? Number(filterShift) : undefined,
-    })
+    setIsExporting(true)
+    try {
+      await downloadProductionOutputsExcel({
+        date_from: filterDate || undefined,
+        date_to:   filterDate || undefined,
+        line_id:   (filterLine  !== 'all') ? Number(filterLine)  : undefined,
+        shift_id:  (filterShift !== 'all') ? Number(filterShift) : undefined,
+      })
+      toast.success('File Excel berhasil diunduh')
+    } catch { toast.error('Export gagal. Coba lagi.') }
+    finally { setIsExporting(false) }
   }
 
-  // ── Import ──
   async function handleImport(file: File) {
     const result = await importProductionOutputsExcel(file)
     toast.success(result.message)
@@ -362,9 +359,8 @@ export default function OutputPage() {
     setFilterType('all')
   }
 
-  // ── Filtered summary rows ──
   const filtered = rows.filter(r => {
-    if (filterDate  && !r.date.startsWith(filterDate))             return false
+    if (filterDate  && !r.date.startsWith(filterDate))               return false
     if (filterLine  !== 'all' && r.line_id  !== Number(filterLine))  return false
     if (filterShift !== 'all' && r.shift_id !== Number(filterShift)) return false
     return true
@@ -376,288 +372,217 @@ export default function OutputPage() {
     return acc
   }, {})
 
+  const totalRecords  = filtered.length
+  const avgActual     = totalRecords > 0 ? Math.round(totalActual / totalRecords) : 0
+  const topOutputType = (() => {
+    let max = -1; let name = ''
+    outputTypes.forEach(ot => {
+      const v = typeTotals[ot.code] ?? 0
+      if (v > max) { max = v; name = ot.name }
+    })
+    return name
+  })()
+
   return (
     <OeeGuard section="input">
-      {/* ── Header ── */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <Activity className="h-6 w-6 text-emerald-600" />
-            Input Production Output
-          </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Catat hasil produksi per shift — field output mengikuti konfigurasi Master Output Type.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <ExportImportBar
-            role={user?.role ?? 'viewer'}
-            label="Production Output"
-            onExport={handleExport}
-            onImport={handleImport}
-          />
-          <Button
-            onClick={openAdd}
-            className="bg-emerald-600 hover:bg-emerald-700"
-            disabled={outputTypes.length === 0}
-          >
-            <Plus className="h-4 w-4 mr-2" />Tambah Data
-          </Button>
-        </div>
-      </div>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/20">
 
-      {outputTypes.length === 0 && !isLoading && (
-        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 flex items-center gap-2 text-sm text-amber-700">
-          <AlertCircle className="h-4 w-4 shrink-0" />
-          Belum ada Output Type aktif. Konfigurasi di{' '}
-          <a href="/oee/master/output-type" className="underline font-medium">Master → Output Type</a>.
-        </div>
-      )}
-
-      {/* ── Stats ── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <Card className="border-0 shadow-sm">
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="p-2.5 rounded-lg bg-emerald-50">
-              <TrendingUp className="h-5 w-5 text-emerald-600" />
+        {/* ── Hero header ── */}
+        <div className="relative overflow-hidden bg-gradient-to-r from-emerald-700 to-teal-600 px-8 py-10">
+          <div className="absolute -top-8 -right-8 h-40 w-40 rounded-full bg-white/5" />
+          <div className="absolute -bottom-10 -left-6 h-32 w-32 rounded-full bg-white/5" />
+          <div className="relative flex items-center gap-4">
+            <div className="h-14 w-14 rounded-2xl bg-white/15 backdrop-blur flex items-center justify-center">
+              <Activity className="h-7 w-7 text-white" />
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Total Records</p>
-              <p className="text-2xl font-bold text-emerald-600">{filtered.length}</p>
+              <p className="text-white/60 text-xs font-semibold uppercase tracking-widest mb-1">Input Data</p>
+              <h2 className="text-3xl font-bold text-white tracking-tight">Production Output</h2>
+              <p className="text-white/70 text-sm mt-1">Pencatatan hasil produksi harian per shift &amp; line</p>
             </div>
-          </CardContent>
-        </Card>
-        <Card className="border-0 shadow-sm">
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="p-2.5 rounded-lg bg-blue-50">
-              <Package className="h-5 w-5 text-blue-600" />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Total Actual (kg)</p>
-              <p className="text-2xl font-bold text-blue-600">{fmt(totalActual)}</p>
-            </div>
-          </CardContent>
-        </Card>
-        {outputTypes.slice(0, 2).map((ot, idx) => (
-          <Card key={ot.code} className="border-0 shadow-sm">
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className={cn('p-2.5 rounded-lg', bgColor(idx))}>
-                <Layers className={cn('h-5 w-5', textColor(idx))} />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">{ot.name} (kg)</p>
-                <p className={cn('text-2xl font-bold', textColor(idx))}>
-                  {fmt(typeTotals[ot.code] ?? 0)}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+          </div>
+        </div>
 
-      {/* ── Filters ── */}
-      <Card className="border-0 shadow-sm mb-4">
-        <CardContent className="p-4">
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            <div className="space-y-1">
-              <Label className="text-xs">Tanggal</Label>
-              <Input
-                type="date"
-                value={filterDate}
-                onChange={e => setFilterDate(e.target.value)}
-                className="h-8 text-sm"
+        <div className="p-8 space-y-6">
+
+          {/* ── Title row ── */}
+          <div className="flex flex-wrap justify-between items-center gap-3">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">Production Output Input</h1>
+              <p className="text-sm text-slate-500 mt-0.5">Riwayat hasil produksi harian per shift per line</p>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <ExportImportBar
+                role={user?.role ?? 'viewer'}
+                label="Production Output"
+                onExport={handleExport}
+                onImport={handleImport}
+                exportLoading={isExporting}
               />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Line</Label>
-              <Select value={filterLine} onValueChange={setFilterLine}>
-                <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Semua Line</SelectItem>
-                  {lines.map(l => (
-                    <SelectItem key={l.id} value={String(l.id)}>{l.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Shift</Label>
-              <Select value={filterShift} onValueChange={setFilterShift}>
-                <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Semua Shift</SelectItem>
-                  {shifts.map(s => (
-                    <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {/* Filter output type — hanya relevan untuk tab bytype */}
-            <div className="space-y-1">
-              <Label className="text-xs">Output Type</Label>
-              <Select value={filterType} onValueChange={setFilterType}>
-                <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Semua Type</SelectItem>
-                  {outputTypes.map(ot => (
-                    <SelectItem key={ot.code} value={ot.code}>{ot.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-end">
               <Button
-                variant="outline" size="sm" className="h-8 text-xs"
-                onClick={resetFilters}
+                className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-sm"
+                onClick={openAdd}
+                disabled={outputTypes.length === 0}
               >
-                <RotateCcw className="h-3 w-3 mr-1" />Reset
+                <Plus className="h-4 w-4 mr-2" /> Tambah Data
               </Button>
             </div>
           </div>
-        </CardContent>
-      </Card>
 
-      {/* ── Tabs ── */}
-      <Tabs value={activeTab} onValueChange={handleTabChange}>
-        <TabsList className="mb-4">
-          <TabsTrigger value="summary">Summary</TabsTrigger>
-          <TabsTrigger value="bytype">Per Output Type</TabsTrigger>
-        </TabsList>
+          {/* ── Warning: no output types ── */}
+          {outputTypes.length === 0 && !isLoading && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 flex items-center gap-2 text-sm text-amber-700">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              Belum ada Output Type aktif. Konfigurasi di{' '}
+              <a href="/oee/master/output-type" className="underline font-medium">Master → Output Type</a>.
+            </div>
+          )}
 
-        {/* ══ SUMMARY TAB ══ */}
-        <TabsContent value="summary">
-          <Card className="border-0 shadow-sm">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-semibold flex items-center gap-2">
-                <Activity className="h-4 w-4 text-emerald-600" />
-                Data Production Output
-                <Badge variant="secondary" className="ml-1">{filtered.length}</Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              {isLoading ? (
-                <div className="flex items-center justify-center py-16">
-                  <Loader2 className="h-6 w-6 animate-spin text-emerald-500" />
-                  <span className="ml-2 text-sm text-muted-foreground">Memuat data...</span>
+          {/* ── Filter bar ── */}
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-4">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 items-end">
+              <div className="space-y-1">
+                <Label className="text-xs font-medium text-slate-600">Tanggal</Label>
+                <Input
+                  type="date"
+                  value={filterDate}
+                  onChange={e => setFilterDate(e.target.value)}
+                  className="h-9 text-sm"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs font-medium text-slate-600">Line</Label>
+                <Select value={filterLine} onValueChange={setFilterLine}>
+                  <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Semua Line</SelectItem>
+                    {lines.map(l => (
+                      <SelectItem key={l.id} value={String(l.id)}>{l.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs font-medium text-slate-600">Shift</Label>
+                <Select value={filterShift} onValueChange={setFilterShift}>
+                  <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Semua Shift</SelectItem>
+                    {shifts.map(s => (
+                      <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs font-medium text-slate-600">Output Type</Label>
+                <Select value={filterType} onValueChange={setFilterType}>
+                  <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Semua Type</SelectItem>
+                    {outputTypes.map(ot => (
+                      <SelectItem key={ot.code} value={ot.code}>{ot.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-end">
+                <Button
+                  variant="outline" size="sm" className="h-9 text-xs w-full"
+                  onClick={resetFilters}
+                >
+                  <RotateCcw className="h-3 w-3 mr-1.5" />Reset Filter
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* ── KPI Cards ── */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="rounded-2xl border border-slate-100 bg-white shadow-sm p-4 flex items-center gap-3">
+              <div className="h-11 w-11 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0">
+                <TrendingUp className="h-5 w-5 text-emerald-600" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Total Records</p>
+                <p className="text-2xl font-bold text-emerald-600 tabular-nums">{totalRecords}</p>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-slate-100 bg-white shadow-sm p-4 flex items-center gap-3">
+              <div className="h-11 w-11 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
+                <Package className="h-5 w-5 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Total Actual (kg)</p>
+                <p className="text-2xl font-bold text-blue-600 tabular-nums">{fmt(totalActual)}</p>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-slate-100 bg-white shadow-sm p-4 flex items-center gap-3">
+              <div className="h-11 w-11 rounded-xl bg-violet-50 flex items-center justify-center shrink-0">
+                <Activity className="h-5 w-5 text-violet-600" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Rata-rata/Record (kg)</p>
+                <p className="text-2xl font-bold text-violet-600 tabular-nums">{fmt(avgActual)}</p>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-slate-100 bg-white shadow-sm p-4 flex items-center gap-3">
+              <div className="h-11 w-11 rounded-xl bg-amber-50 flex items-center justify-center shrink-0">
+                <Layers className="h-5 w-5 text-amber-600" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">Output Terbanyak</p>
+                <p className="text-sm font-bold text-amber-700 truncate">{topOutputType || '—'}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Tabs ── */}
+          <Tabs value={activeTab} onValueChange={handleTabChange}>
+            <TabsList className="mb-2">
+              <TabsTrigger value="summary">Summary</TabsTrigger>
+              <TabsTrigger value="bytype">Per Output Type</TabsTrigger>
+            </TabsList>
+
+            {/* ══ SUMMARY TAB ══ */}
+            <TabsContent value="summary">
+              <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
+                  <Activity className="h-4 w-4 text-emerald-600" />
+                  <span className="text-base font-semibold text-slate-900">Data Production Output</span>
+                  <Badge variant="secondary" className="ml-1">{filtered.length}</Badge>
                 </div>
-              ) : filtered.length === 0 ? (
-                <div className="text-center py-16 text-muted-foreground">
-                  <Activity className="h-8 w-8 mx-auto mb-2 opacity-30" />
-                  <p className="text-sm">Belum ada data production output.</p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-slate-50">
-                        <TableHead className="whitespace-nowrap">Tanggal</TableHead>
-                        <TableHead>Line</TableHead>
-                        <TableHead>Shift</TableHead>
-                        <TableHead>Kode Pakan</TableHead>
-                        {/* kolom dinamis dari outputTypes */}
-                        {outputTypes.map(ot => (
-                          <TableHead key={ot.code} className="text-right whitespace-nowrap">
-                            {ot.name} (kg)
-                          </TableHead>
-                        ))}
-                        <TableHead className="text-right whitespace-nowrap">Actual (kg)</TableHead>
-                        <TableHead className="text-center">Aksi</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filtered.map(r => (
-                        <TableRow key={r.id}>
-                          <TableCell className="text-sm whitespace-nowrap">{fmtDate(r.date)}</TableCell>
-                          <TableCell className="text-sm">{r.line_name ?? '—'}</TableCell>
-                          <TableCell className="text-sm">{r.shift_name ?? '—'}</TableCell>
-                          <TableCell>
-                            {r.feed_code_code
-                              ? <code className="bg-slate-100 text-slate-700 text-xs px-1.5 py-0.5 rounded">{r.feed_code_code}</code>
-                              : <span className="text-muted-foreground text-xs">—</span>}
-                          </TableCell>
-                          {outputTypes.map((ot, idx) => (
-                            <TableCell key={ot.code} className={cn('text-right text-sm', textColor(idx))}>
-                              {fmt(r.quantities?.[ot.code] ?? 0)}
-                            </TableCell>
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-16">
+                    <Loader2 className="h-6 w-6 animate-spin text-emerald-500" />
+                    <span className="ml-2 text-sm text-muted-foreground">Memuat data...</span>
+                  </div>
+                ) : filtered.length === 0 ? (
+                  <div className="text-center py-16 text-muted-foreground">
+                    <Activity className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                    <p className="text-sm">Belum ada data production output.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-slate-50">
+                          <TableHead className="whitespace-nowrap">Tanggal</TableHead>
+                          <TableHead>Line</TableHead>
+                          <TableHead>Shift</TableHead>
+                          <TableHead>Kode Pakan</TableHead>
+                          {outputTypes.map(ot => (
+                            <TableHead key={ot.code} className="text-right whitespace-nowrap">
+                              {ot.name} (kg)
+                            </TableHead>
                           ))}
-                          <TableCell className="text-right text-sm font-semibold text-emerald-700">
-                            {fmt(r.actual_output)}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center justify-center gap-1">
-                              <Button
-                                size="icon" variant="ghost"
-                                className="h-7 w-7 text-slate-500 hover:text-emerald-600"
-                                onClick={() => setViewRow(r)}
-                              >
-                                <Eye className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button
-                                size="icon" variant="ghost"
-                                className="h-7 w-7 text-slate-500 hover:text-blue-600"
-                                onClick={() => openEdit(r)}
-                              >
-                                <Pencil className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button
-                                size="icon" variant="ghost"
-                                className="h-7 w-7 text-slate-500 hover:text-red-600"
-                                onClick={() => setDeleteId(r.id)}
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            </div>
-                          </TableCell>
+                          <TableHead className="text-right whitespace-nowrap">Actual (kg)</TableHead>
+                          <TableHead className="text-center">Aksi</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* ══ BY-TYPE TAB ══ */}
-        <TabsContent value="bytype">
-          <Card className="border-0 shadow-sm">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-semibold flex items-center gap-2">
-                <Layers className="h-4 w-4 text-violet-600" />
-                Data Per Output Type
-                <Badge variant="secondary" className="ml-1">{outputByType.length}</Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              {isLoadingByType ? (
-                <div className="flex items-center justify-center py-16">
-                  <Loader2 className="h-6 w-6 animate-spin text-violet-500" />
-                  <span className="ml-2 text-sm text-muted-foreground">Memuat data...</span>
-                </div>
-              ) : outputByType.length === 0 ? (
-                <div className="text-center py-16 text-muted-foreground">
-                  <Layers className="h-8 w-8 mx-auto mb-2 opacity-30" />
-                  <p className="text-sm">Tidak ada data untuk filter ini.</p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-slate-50">
-                        <TableHead className="whitespace-nowrap">Tanggal</TableHead>
-                        <TableHead>Line</TableHead>
-                        <TableHead>Shift</TableHead>
-                        <TableHead>Kode Pakan</TableHead>
-                        <TableHead>Output Type</TableHead>
-                        <TableHead>Kategori</TableHead>
-                        <TableHead className="text-right">Qty (kg)</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {outputByType.map(r => {
-                        const otIdx = outputTypes.findIndex(ot => ot.code === r.output_type)
-                        return (
-                          <TableRow key={r.item_id}>
+                      </TableHeader>
+                      <TableBody>
+                        {filtered.map(r => (
+                          <TableRow key={r.id} className="hover:bg-slate-50/60">
                             <TableCell className="text-sm whitespace-nowrap">{fmtDate(r.date)}</TableCell>
                             <TableCell className="text-sm">{r.line_name ?? '—'}</TableCell>
                             <TableCell className="text-sm">{r.shift_name ?? '—'}</TableCell>
@@ -666,40 +591,121 @@ export default function OutputPage() {
                                 ? <code className="bg-slate-100 text-slate-700 text-xs px-1.5 py-0.5 rounded">{r.feed_code_code}</code>
                                 : <span className="text-muted-foreground text-xs">—</span>}
                             </TableCell>
+                            {outputTypes.map((ot, idx) => (
+                              <TableCell key={ot.code} className={cn('text-right text-sm', textColor(idx))}>
+                                {fmt(r.quantities?.[ot.code] ?? 0)}
+                              </TableCell>
+                            ))}
+                            <TableCell className="text-right text-sm font-semibold text-emerald-700">
+                              {fmt(r.actual_output)}
+                            </TableCell>
                             <TableCell>
-                              <div className="flex items-center gap-1.5">
-                                <span className={cn('h-2 w-2 rounded-full shrink-0', dotColor(otIdx >= 0 ? otIdx : 0))} />
-                                <span className="text-sm font-medium">{r.output_type}</span>
+                              <div className="flex items-center justify-center gap-1">
+                                <Button size="icon" variant="ghost"
+                                  className="h-7 w-7 text-slate-500 hover:text-emerald-600"
+                                  onClick={() => setViewRow(r)}>
+                                  <Eye className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button size="icon" variant="ghost"
+                                  className="h-7 w-7 text-slate-500 hover:text-blue-600"
+                                  onClick={() => openEdit(r)}>
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button size="icon" variant="ghost"
+                                  className="h-7 w-7 text-slate-500 hover:text-red-600"
+                                  onClick={() => setDeleteId(r.id)}>
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
                               </div>
                             </TableCell>
-                            <TableCell>
-                              <Badge variant="outline" className="text-xs font-mono">{r.category}</Badge>
-                            </TableCell>
-                            <TableCell className={cn('text-right text-sm font-medium', textColor(otIdx >= 0 ? otIdx : 0))}>
-                              {fmt(r.quantity)}
-                            </TableCell>
                           </TableRow>
-                        )
-                      })}
-                    </TableBody>
-                    {/* Footer total per type */}
-                    <tfoot>
-                      <tr className="bg-slate-50 border-t-2 font-semibold">
-                        <td colSpan={6} className="px-4 py-2 text-xs text-slate-600 uppercase tracking-wide">
-                          Total
-                        </td>
-                        <td className="px-4 py-2 text-right text-sm text-emerald-700">
-                          {fmt(outputByType.reduce((s, r) => s + r.quantity, 0))}
-                        </td>
-                      </tr>
-                    </tfoot>
-                  </Table>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+
+            {/* ══ BY-TYPE TAB ══ */}
+            <TabsContent value="bytype">
+              <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
+                  <Layers className="h-4 w-4 text-violet-600" />
+                  <span className="text-base font-semibold text-slate-900">Data Per Output Type</span>
+                  <Badge variant="secondary" className="ml-1">{outputByType.length}</Badge>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+                {isLoadingByType ? (
+                  <div className="flex items-center justify-center py-16">
+                    <Loader2 className="h-6 w-6 animate-spin text-violet-500" />
+                    <span className="ml-2 text-sm text-muted-foreground">Memuat data...</span>
+                  </div>
+                ) : outputByType.length === 0 ? (
+                  <div className="text-center py-16 text-muted-foreground">
+                    <Layers className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                    <p className="text-sm">Tidak ada data untuk filter ini.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-slate-50">
+                          <TableHead className="whitespace-nowrap">Tanggal</TableHead>
+                          <TableHead>Line</TableHead>
+                          <TableHead>Shift</TableHead>
+                          <TableHead>Kode Pakan</TableHead>
+                          <TableHead>Output Type</TableHead>
+                          <TableHead>Kategori</TableHead>
+                          <TableHead className="text-right">Qty (kg)</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {outputByType.map(r => {
+                          const otIdx = outputTypes.findIndex(ot => ot.code === r.output_type)
+                          return (
+                            <TableRow key={r.item_id} className="hover:bg-slate-50/60">
+                              <TableCell className="text-sm whitespace-nowrap">{fmtDate(r.date)}</TableCell>
+                              <TableCell className="text-sm">{r.line_name ?? '—'}</TableCell>
+                              <TableCell className="text-sm">{r.shift_name ?? '—'}</TableCell>
+                              <TableCell>
+                                {r.feed_code_code
+                                  ? <code className="bg-slate-100 text-slate-700 text-xs px-1.5 py-0.5 rounded">{r.feed_code_code}</code>
+                                  : <span className="text-muted-foreground text-xs">—</span>}
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-1.5">
+                                  <span className={cn('h-2 w-2 rounded-full shrink-0', dotColor(otIdx >= 0 ? otIdx : 0))} />
+                                  <span className="text-sm font-medium">{r.output_type}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="outline" className="text-xs font-mono">{r.category}</Badge>
+                              </TableCell>
+                              <TableCell className={cn('text-right text-sm font-medium', textColor(otIdx >= 0 ? otIdx : 0))}>
+                                {fmt(r.quantity)}
+                              </TableCell>
+                            </TableRow>
+                          )
+                        })}
+                      </TableBody>
+                      <tfoot>
+                        <tr className="bg-slate-50 border-t-2 font-semibold">
+                          <td colSpan={6} className="px-4 py-2 text-xs text-slate-600 uppercase tracking-wide">
+                            Total
+                          </td>
+                          <td className="px-4 py-2 text-right text-sm text-emerald-700">
+                            {fmt(outputByType.reduce((s, r) => s + r.quantity, 0))}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </Table>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+          </Tabs>
+        </div>
+      </div>
 
       {/* ── Form Dialog ── */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -776,7 +782,6 @@ export default function OutputPage() {
               </Select>
             </div>
 
-            {/* ── Dynamic output quantities dari master ── */}
             <div className="rounded-xl border border-emerald-100 bg-emerald-50/40 p-4 space-y-3">
               <p className="text-xs font-semibold text-emerald-700 uppercase tracking-widest">
                 Output Produksi (kg)
@@ -805,7 +810,6 @@ export default function OutputPage() {
               )}
             </div>
 
-            {/* Live total */}
             {liveActual > 0 && (
               <div className="rounded-xl border bg-emerald-50 border-emerald-200 p-4 flex items-center justify-between">
                 <div>
@@ -836,7 +840,7 @@ export default function OutputPage() {
               <AlertCircle className="h-4 w-4 shrink-0" />{formError}
             </div>
           )}
-          <DialogFooter>
+          <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={isSaving}>
               Batal
             </Button>
