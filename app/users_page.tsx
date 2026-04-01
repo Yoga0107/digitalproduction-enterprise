@@ -235,6 +235,7 @@ export default function UsersPage() {
             onEdit={openEdit}
             onToggleActive={handleToggleActive}
             onManagePlants={user => { setPlantTarget(user); setPlantDialogOpen(true) }}
+            onManageModules={() => {}}
             onResetPassword={setResetTarget}
           />
         </div>
