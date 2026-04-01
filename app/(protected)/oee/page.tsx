@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import {
   Settings, Database, BarChart3, Timer, Factory,
   Package, Activity, Workflow, LineChart, BarChart2,
-  TrendingUp, Clock, Lock, ChevronRight,
+  TrendingUp, Clock, Lock, ChevronRight, Layers,
 } from 'lucide-react';
 
 function SectionCard({
@@ -140,6 +140,7 @@ export default function OEEPage() {
             { href: '/oee/master/kode-pakan',         label: 'Kode Pakan',          icon: Package  },
             { href: '/oee/master/standard-throughput',label: 'Standard Throughput', icon: Activity },
             { href: '/oee/master/machine-losses',     label: 'Machine Losses',      icon: Workflow },
+            { href: '/oee/master/output-type',        label: 'Output Type',         icon: Layers   },
           ]}
         />
 

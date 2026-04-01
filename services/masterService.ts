@@ -5,6 +5,7 @@ import {
   ApiShift, ApiFeedCode, ApiLine, ApiStandardThroughput,
   ApiProductionOutput,
   ApiMergedLine,
+  ApiOutputType,
 } from '@/types/api';
 
 // ─── Machine Loss Level 1 ──────────────────────────────────────────────────
@@ -122,3 +123,18 @@ export const updateMergedLine = (id: number, data: Partial<{ name: string; code:
   api.put<ApiMergedLine>(`/api/v1/master/merged-lines/${id}`, data);
 export const deleteMergedLine = (id: number) =>
   api.delete(`/api/v1/master/merged-lines/${id}`);
+// ─── Output Types ──────────────────────────────────────────────────────────
+export const getOutputTypes = () =>
+  api.get<ApiOutputType[]>('/api/v1/master/output-types');
+export const getActiveOutputTypes = () =>
+  api.get<ApiOutputType[]>('/api/v1/master/output-types/active');
+export const createOutputType = (data: {
+  code: string; name: string; category: string;
+  is_good_product?: boolean; sort_order?: number; remarks?: string;
+}) => api.post<ApiOutputType>('/api/v1/master/output-types', data);
+export const updateOutputType = (id: number, data: Partial<{
+  name: string; category: string; is_good_product: boolean;
+  sort_order: number; remarks: string; is_active: boolean;
+}>) => api.put<ApiOutputType>(`/api/v1/master/output-types/${id}`, data);
+export const deleteOutputType = (id: number) =>
+  api.delete(`/api/v1/master/output-types/${id}`);

@@ -85,11 +85,7 @@ export const createProductionOutput = (data: {
   shift_id: number
   feed_code_id?: number | null
   production_plan?: number | null
-  finished_goods: number
-  downgraded_product: number
-  wip: number
-  remix: number
-  reject_product: number
+  quantities?: Record<string, number>
   remarks?: string
 }) => api.post<ApiProductionOutput>('/api/v1/input/production-outputs', data)
 
@@ -98,8 +94,7 @@ export const updateProductionOutput = (
   data: Partial<{
     date: string; line_id: number; shift_id: number
     feed_code_id: number | null; production_plan: number | null
-    finished_goods: number; downgraded_product: number
-    wip: number; remix: number; reject_product: number; remarks: string
+    quantities: Record<string, number>; remarks: string
   }>
 ) => api.put<ApiProductionOutput>(`/api/v1/input/production-outputs/${id}`, data)
 

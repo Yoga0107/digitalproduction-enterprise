@@ -84,6 +84,19 @@ export interface ApiStandardThroughput {
   created_at: string; created_by_id: number | null;
 }
 
+export interface ApiOutputType {
+  id: number
+  code: string
+  name: string
+  category: string
+  is_good_product: boolean
+  sort_order: number
+  remarks: string | null
+  is_active: boolean
+  created_at: string
+  created_by_id: number | null
+}
+
 export interface ApiProductionOutputItem {
   item_id:         number
   group_id:        string
@@ -94,30 +107,24 @@ export interface ApiProductionOutputItem {
   shift_name:      string | null
   feed_code_id:    number | null
   feed_code_code:  string | null
-  output_type:     'finished_goods' | 'downgraded_product' | 'wip' | 'remix' | 'reject_product'
-  category:        'FG' | 'DOWNGRADED' | 'WIP' | 'REMIX' | 'REJECT'
+  output_type:     string
+  category:        string
   quantity:        number
   remarks:         string | null
 }
 
 export interface ApiProductionOutput {
-  /** group_id (UUID string) — ties 5 rows together; used for edit/delete */
+  /** group_id (UUID string) — ties N rows together; used for edit/delete */
   id: string
   date: string
   line_id: number
   shift_id: number
   feed_code_id: number | null
   production_plan: number | null
-  // 5 output quantities (flattened from 5 DB rows)
-  finished_goods: number
-  downgraded_product: number
-  wip: number
-  remix: number
-  reject_product: number
+  // quantities dinamis per output_type {code: quantity}
+  quantities: Record<string, number>
   // computed
   actual_output: number
-  good_product: number
-  quality_rate: number
   remarks: string | null
   is_active: boolean
   created_at: string
