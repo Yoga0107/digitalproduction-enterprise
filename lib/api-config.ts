@@ -9,7 +9,8 @@
  *   api.get(ENDPOINTS.SHIFTS)
  */
 
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
+// const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
+const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'https://oee-backend-production.up.railway.app'
 const V1   = `${BASE}/api/v1`
 
 export const API_BASE_URL = BASE
