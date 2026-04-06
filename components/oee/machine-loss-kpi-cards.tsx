@@ -3,23 +3,23 @@
 import { Card, CardContent } from '@/components/ui/card'
 import { Clock, Timer, AlertTriangle, Wrench } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { fmtHours } from '@/lib/machine-loss-utils'
+import { fmtMinutes } from '@/lib/machine-loss-utils'
 
 type Props = {
-  totalEvents:   number
+  totalEvents:  number
   /** Total duration in MINUTES */
-  totalHours:    number
+  totalMinutes: number
   /** Average duration in MINUTES */
-  avgHours:      number
-  topLossType:   string
+  avgMinutes:   number
+  topLossType:  string
 }
 
-export function MachineLossKpiCards({ totalEvents, totalHours, avgHours, topLossType }: Props) {
+export function MachineLossKpiCards({ totalEvents, totalMinutes, avgMinutes, topLossType }: Props) {
   const cards = [
-    { label: 'Total Events',   value: String(totalEvents),  icon: AlertTriangle, color: 'text-orange-600', bg: 'bg-orange-50' },
-    { label: 'Total Downtime', value: fmtHours(totalHours), icon: Clock,         color: 'text-red-600',    bg: 'bg-red-50'    },
-    { label: 'Avg Duration',   value: fmtHours(avgHours),   icon: Timer,         color: 'text-violet-600', bg: 'bg-violet-50' },
-    { label: 'Top Loss Type',  value: topLossType || '—',   icon: Wrench,        color: 'text-teal-600',   bg: 'bg-teal-50'   },
+    { label: 'Total Events',   value: String(totalEvents),      icon: AlertTriangle, color: 'text-orange-600', bg: 'bg-orange-50' },
+    { label: 'Total Downtime', value: fmtMinutes(totalMinutes), icon: Clock,         color: 'text-red-600',    bg: 'bg-red-50'    },
+    { label: 'Avg Duration',   value: fmtMinutes(avgMinutes),   icon: Timer,         color: 'text-violet-600', bg: 'bg-violet-50' },
+    { label: 'Top Loss Type',  value: topLossType || '—',       icon: Wrench,        color: 'text-teal-600',   bg: 'bg-teal-50'   },
   ]
 
   return (

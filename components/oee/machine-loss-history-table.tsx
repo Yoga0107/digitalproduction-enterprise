@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Loader2, Pencil, Trash2, Eye, WrenchIcon } from 'lucide-react'
 import { ApiMachineLossInput } from '@/types/api'
-import { fmtDate, fmtHours } from '@/lib/machine-loss-utils'
+import { fmtDate, fmtMinutes } from '@/lib/machine-loss-utils'
 import { cn } from '@/lib/utils'
 
 type Props = {
@@ -169,7 +169,7 @@ export function MachineLossHistoryTable({ rows, isLoading, onEdit, onDelete, onV
 
                       <td className="px-4 py-3 text-right whitespace-nowrap">
                         <span className="text-sm font-bold text-orange-600 tabular-nums">
-                          {fmtHours(r.duration_minutes)}
+                          {fmtMinutes(r.duration_minutes)}
                         </span>
                       </td>
 

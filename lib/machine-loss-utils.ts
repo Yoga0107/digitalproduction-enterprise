@@ -13,18 +13,26 @@ export function calcDurationHours(from: string, to: string): number {
 }
 
 /**
- * Format minutes into decimal hours string.
- * Examples: 90 min → "1.5 hr"  |  37 min → "0.617 hr"  |  60 min → "1 hr"  |  0 → "—"
- * Input is always in MINUTES (as stored in DB as duration_minutes).
+ * Format nilai duration_minutes dari DB menjadi string jam.
+ * Input selalu dalam MENIT (duration_minutes di DB).
+ *
+ * Contoh:
+ *   30   → "0.5 hr"
+ *   90   → "1.5 hr"
+ *   60   → "1 hr"
+ *   135  → "2.25 hr"
+ *   0    → "—"
  */
-export function fmtHours(minutes: number): string {
-  if (!minutes || minutes <= 0) return '—'
-  const hrs = minutes / 60
-  // If exactly a whole number, show without decimals
-  if (Number.isInteger(hrs)) return `${hrs} hr`
-  // Round to 3 significant decimal places, strip trailing zeros
-  const rounded = parseFloat(hrs.toFixed(3))
+export function fmtMinutes(value: number): string {
+  if (!value || value <= 0) return '—'
+  const hrs = value / 60
+  const rounded = parseFloat(hrs.toFixed(2))
   return `${rounded} hr`
+}
+
+/** @deprecated Gunakan fmtMinutes() */
+export function fmtHours(minutes: number): string {
+  return fmtMinutes(minutes)
 }
 
 /** Format ISO date string to readable date. */

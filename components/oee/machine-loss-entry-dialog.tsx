@@ -16,7 +16,7 @@ import {
 } from 'lucide-react'
 import { ApiLine, ApiShift, ApiMachineLossLvl1, ApiMachineLossLvl2, ApiMachineLossLvl3, ApiFeedCode } from '@/types/api'
 import { cn } from '@/lib/utils'
-import { calcDurationHours, fmtHours } from '@/lib/machine-loss-utils'
+import { calcDurationHours, fmtMinutes } from '@/lib/machine-loss-utils'
 
 export type MachineLossFormState = {
   date:           string
@@ -213,7 +213,7 @@ export function MachineLossEntryDialog({
     const adjShiftEnd      = shiftEnd <= toMin(selectedShift.time_from) ? shiftEnd + 24 * 60 : shiftEnd
     if (adjEnd > adjShiftEnd) {
       const over = adjEnd - adjShiftEnd
-      return `Downtime melewati batas shift (${selectedShift.time_to}) sejauh ${fmtHours(over)}. Data akan otomatis disimpan dalam ${Math.min(shifts.length, 2)} record terpisah.`
+      return `Downtime melewati batas shift (${selectedShift.time_to}) sejauh ${fmtMinutes(over)}. Data akan otomatis disimpan dalam ${Math.min(shifts.length, 2)} record terpisah.`
     }
     return null
   })()
@@ -415,7 +415,7 @@ export function MachineLossEntryDialog({
                 {displayHours > 0 && (
                   <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none">
                     <span className="text-xs font-bold text-orange-600 bg-orange-50 border border-orange-100 px-2 py-0.5 rounded">
-                      {fmtHours(displayHours * 60)}
+                      {fmtMinutes(displayHours * 60)}
                     </span>
                   </div>
                 )}

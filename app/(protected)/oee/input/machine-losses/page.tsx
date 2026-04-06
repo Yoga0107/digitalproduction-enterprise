@@ -29,7 +29,7 @@ import {
 } from '@/services/inputService'
 import { getLines, getShifts, getMachineLossLvl1, getMachineLossLvl2, getMachineLossLvl3, getFeedCodes, getMasterMachineLosses } from '@/services/masterService'
 import { ApiMachineLossInput, ApiLine, ApiShift, ApiMachineLossLvl1, ApiMachineLossLvl2, ApiMachineLossLvl3, ApiFeedCode, ApiMasterMachineLoss } from '@/types/api'
-import { fmtDate, fmtHours } from '@/lib/machine-loss-utils'
+import { fmtDate, fmtMinutes } from '@/lib/machine-loss-utils'
 
 // ─── Split record type ────────────────────────────────────────────────────────
 interface SplitRecord {
@@ -130,7 +130,7 @@ function MachineLossDetailDialog({
               </div>
               <div className="px-4 py-3 text-center">
                 <p className="text-xs text-muted-foreground mb-1">Durasi</p>
-                <p className="font-bold text-orange-600 text-lg">{fmtHours(row.duration_minutes)}</p>
+                <p className="font-bold text-orange-600 text-lg">{fmtMinutes(row.duration_minutes)}</p>
               </div>
             </div>
           </div>
@@ -218,7 +218,7 @@ function SplitShiftPreviewDialog({
                 </Badge>
               )}
               <Badge variant="outline" className="text-xs">
-                Total: {fmtHours(totalMin)}
+                Total: {fmtMinutes(totalMin)}
               </Badge>
             </div>
             {l1 && (
@@ -254,7 +254,7 @@ function SplitShiftPreviewDialog({
                     'text-sm font-bold',
                     i === 0 ? 'text-blue-700' : 'text-indigo-700'
                   )}>
-                    {fmtHours(rec.duration_minutes)}
+                    {fmtMinutes(rec.duration_minutes)}
                   </span>
                 </div>
                 <div className="flex items-center gap-3 text-xs text-slate-600">
@@ -273,7 +273,7 @@ function SplitShiftPreviewDialog({
           {/* Summary bar */}
           <div className="rounded-lg bg-slate-800 text-white px-4 py-2.5 flex items-center justify-between text-sm">
             <span className="text-slate-400 text-xs">Total downtime</span>
-            <span className="font-bold">{fmtHours(totalMin)} ({totalMin} menit)</span>
+            <span className="font-bold">{fmtMinutes(totalMin)}</span>
           </div>
         </div>
 
@@ -668,8 +668,8 @@ export default function MachineLossInputPage() {
             onClear={() => { setFilterDate(''); setFilterLine('all'); setFilterShift('all') }}
           />
 
-          <MachineLossKpiCards totalEvents={filtered.length} totalHours={totalMinutes}
-            avgHours={avgMinutes} topLossType={topL1} />
+          <MachineLossKpiCards totalEvents={filtered.length} totalMinutes={totalMinutes}
+            avgMinutes={avgMinutes} topLossType={topL1} />
 
           <MachineLossHistoryTable rows={filtered} isLoading={isLoading}
             onEdit={openEdit} onDelete={setDeleteId} onView={setViewRow} />
