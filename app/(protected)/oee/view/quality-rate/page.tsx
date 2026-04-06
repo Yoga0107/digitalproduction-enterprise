@@ -1,125 +1,29 @@
 "use client"
 
 import { OeeGuard } from '@/components/oee/oee-guard'
-import { useState, useMemo } from "react"
-
-import { LineChart } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle
-} from "@/components/ui/card"
-
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter
-} from "@/components/ui/dialog"
-
+import { AlertCircle, LineChart, RefreshCw } from "lucide-react"
+import { Card, CardContent } from "@/components/ui/card"
+import { OeeFilterBar } from "@/components/oee/oee-filter-bar"
 import { QualityRateTable } from "@/components/oee/quality-rate-table"
-import { QualityRow } from "@/types/quality-types"
-
-import { saveAs } from "file-saver"
-import ExcelJS from "exceljs"
+import { useOeeMetrics } from "@/hooks/useOeeMetrics"
 
 export default function QualityRatePage() {
+  const {
+    dateFrom, setDateFrom, dateTo, setDateTo,
+    groupBy, setGroupBy, showDetail, setShowDetail,
+    rows, lines, loading, error, fetchData,
+  } = useOeeMetrics()
 
-  const [fromDate, setFromDate] = useState("")
-  const [toDate, setToDate] = useState("")
-  const [month, setMonth] = useState("")
-
-  const [exportOpen, setExportOpen] = useState(false)
-  const [exportStart, setExportStart] = useState("")
-  const [exportEnd, setExportEnd] = useState("")
-
-  const data: QualityRow[] = [
-    { date: "2026-03-01", line1: 94.22, line2: 96.71, line3: 77.78, line4: 90.17, line5: 97.68, line6: 93.30, allLine: 94.29 },
-    { date: "2026-03-02", line1: 96.36, line2: 85.97, line3: 52.77, line4: 76.77, line5: 93.44, line6: 90.97, allLine: 88.96 },
-    { date: "2026-03-03", line1: 92.34, line2: 87.40, line3: 73.75, line4: 88.88, line5: 96.65, line6: 94.71, allLine: 91.59 },
-  ]
-
-  const filteredData = useMemo(() => {
-    let result = data
-    if (month) result = result.filter(r => r.date.startsWith(month))
-    if (fromDate) result = result.filter(r => r.date >= fromDate)
-    if (toDate) result = result.filter(r => r.date <= toDate)
-    return result
-  }, [data, fromDate, toDate, month])
-
-  async function exportExcel() {
-    if (!exportStart || !exportEnd) {
-      alert("Please select start date and end date")
-      return
-    }
-
-    const filtered = data.filter(d => d.date >= exportStart && d.date <= exportEnd)
-
-    const workbook = new ExcelJS.Workbook()
-    const sheet = workbook.addWorksheet("Quality Rate")
-
-    sheet.columns = [
-      { header: "Date", key: "date", width: 15 },
-      { header: "Line 1", key: "line1", width: 12 },
-      { header: "Line 2", key: "line2", width: 12 },
-      { header: "Line 3A & 3B", key: "line3", width: 14 },
-      { header: "Line 4", key: "line4", width: 12 },
-      { header: "Line 5", key: "line5", width: 12 },
-      { header: "Line 6A & 6B", key: "line6", width: 14 },
-      { header: "All Line", key: "allLine", width: 14 }
-    ]
-
-    sheet.getRow(1).eachCell(cell => {
-      cell.font = { bold: true, color: { argb: "FFFFFFFF" } }
-      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F4E78" } }
-      cell.alignment = { horizontal: "center", vertical: "middle" }
-    })
-
-    filtered.forEach(r => {
-      const row = sheet.addRow({
-        date: new Date(r.date).toLocaleDateString("id-ID"),
-        line1: r.line1,
-        line2: r.line2,
-        line3: r.line3,
-        line4: r.line4,
-        line5: r.line5,
-        line6: r.line6,
-        allLine: r.allLine
-      })
-      row.eachCell(cell => { cell.alignment = { horizontal: "center" } })
-    })
-
-    sheet.eachRow((row, rowNumber) => {
-      if (rowNumber === 1) return
-      row.eachCell((cell, colNumber) => {
-        if (colNumber === 1) return
-        const v = cell.value as number
-        if (!v) return
-        if (v >= 100) {
-          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFC6EFCE" } }
-        } else if (v >= 90) {
-          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFEB9C" } }
-        } else {
-          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFC7CE" } }
-        }
-      })
-    })
-
-    const buffer = await workbook.xlsx.writeBuffer()
-    saveAs(new Blob([buffer]), "quality-rate.xlsx")
-    setExportOpen(false)
-  }
+  const allQual = rows.map(r => r.all_line.quality).filter((v): v is number => v !== null)
+  const avg = allQual.length ? allQual.reduce((a, b) => a + b, 0) / allQual.length : null
+  const min = allQual.length ? Math.min(...allQual) : null
+  const max = allQual.length ? Math.max(...allQual) : null
+  const fmtPct = (v: number | null) => v === null ? "N/A" : `${v.toFixed(1)}%`
 
   return (
     <OeeGuard section="view">
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50/30">
-        {/* HERO */}
-        <div className="relative overflow-hidden bg-gradient-to-r from-teal-800 via-teal-700 to-cyan-600 px-8 py-10">
+      <div className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-cyan-50/30">
+        <div className="relative overflow-hidden bg-gradient-to-r from-sky-800 via-sky-700 to-cyan-600 px-8 py-10">
           <div className="absolute -top-8 -right-8 h-40 w-40 rounded-full bg-white/5" />
           <div className="relative flex items-center gap-4">
             <div className="h-14 w-14 rounded-2xl bg-white/15 backdrop-blur flex items-center justify-center">
@@ -128,59 +32,59 @@ export default function QualityRatePage() {
             <div>
               <p className="text-white/60 text-xs font-semibold uppercase tracking-widest mb-1">OEE Data View</p>
               <h1 className="text-3xl font-bold text-white tracking-tight">Quality Rate</h1>
-              <p className="text-white/70 text-sm mt-1">Persentase kualitas produksi</p>
+              <p className="text-white/70 text-sm mt-1">Good Product ÷ Actual Output × 100%</p>
             </div>
           </div>
         </div>
-        <div className="p-8 space-y-6">
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-emerald-900 flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-emerald-500 inline-block" />Filter
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-wrap items-end gap-6">
-              <div className="flex flex-col">
-                <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide">From Date</p>
-                <Input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} />
-              </div>
-              <div className="flex flex-col">
-                <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide">To Date</p>
-                <Input type="date" value={toDate} onChange={e => setToDate(e.target.value)} />
-              </div>
-              <div className="flex flex-col">
-                <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide">Monthly</p>
-                <Input type="month" value={month} onChange={e => setMonth(e.target.value)} />
-              </div>
-              <Button onClick={() => setExportOpen(true)} className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-sm gap-2">
-                📊 Export Excel
-              </Button>
+        <div className="p-6 space-y-6">
+          <OeeFilterBar
+            dateFrom={dateFrom} dateTo={dateTo} groupBy={groupBy}
+            showDetail={showDetail} loading={loading}
+            onDateFrom={setDateFrom} onDateTo={setDateTo} onGroupBy={setGroupBy}
+            onToggleDetail={() => setShowDetail(v => !v)} onFetch={fetchData}
+          />
+
+          {error && (
+            <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+              <AlertCircle className="h-4 w-4 shrink-0" />{error}
+            </div>
+          )}
+
+          {!loading && rows.length > 0 && (
+            <div className="grid grid-cols-3 gap-4">
+              {[
+                { label: "Rata-rata", value: fmtPct(avg), color: "text-sky-700"  },
+                { label: "Minimum",  value: fmtPct(min), color: "text-red-600"  },
+                { label: "Maksimum", value: fmtPct(max), color: "text-cyan-700" },
+              ].map(({ label, value, color }) => (
+                <Card key={label} className="border-0 shadow-sm">
+                  <CardContent className="p-4">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">{label} All Line</p>
+                    <p className={`text-2xl font-bold mt-1 ${color}`}>{value}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          {loading ? (
+            <div className="flex items-center justify-center h-48 border rounded-lg text-muted-foreground text-sm gap-2">
+              <RefreshCw className="h-4 w-4 animate-spin" />Menghitung quality rate...
+            </div>
+          ) : (
+            <QualityRateTable data={rows} lines={lines} showDetail={showDetail} />
+          )}
+
+          <Card className="border border-sky-100 bg-sky-50/40 shadow-none">
+            <CardContent className="p-4 text-xs text-sky-800 space-y-1">
+              <p className="font-semibold text-sky-900 mb-2">📐 Formula</p>
+              <p><span className="font-medium">Actual Output</span> = Σ semua tipe output produksi</p>
+              <p><span className="font-medium">Good Product</span> = output dengan flag <code className="bg-sky-100 px-1 rounded">is_good_product = true</code> (Finished Goods)</p>
+              <p><span className="font-medium">Quality Rate</span> = Good Product ÷ Actual Output × 100%</p>
+              <p><span className="font-medium">All Line</span> = Σ Good Product semua line ÷ Σ Actual semua line × 100%</p>
             </CardContent>
           </Card>
-
-          <QualityRateTable data={filteredData} />
-
-          <Dialog open={exportOpen} onOpenChange={setExportOpen}>
-            <DialogContent>
-              <DialogHeader><DialogTitle>Export Quality Rate</DialogTitle></DialogHeader>
-              <div className="flex flex-col gap-4">
-                <div className="flex flex-col">
-                  <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide">Start Date</p>
-                  <Input type="date" value={exportStart} onChange={e => setExportStart(e.target.value)} />
-                </div>
-                <div className="flex flex-col">
-                  <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide">End Date</p>
-                  <Input type="date" value={exportEnd} onChange={e => setExportEnd(e.target.value)} />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setExportOpen(false)}>Cancel</Button>
-                <Button onClick={exportExcel}>Export</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-
         </div>
       </div>
     </OeeGuard>

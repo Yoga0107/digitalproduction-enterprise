@@ -1,109 +1,29 @@
 "use client"
 
 import { OeeGuard } from '@/components/oee/oee-guard'
-import { useState, useMemo } from "react"
-
-import { TrendingUp } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle
-} from "@/components/ui/card"
-
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter
-} from "@/components/ui/dialog"
-
+import { AlertCircle, TrendingUp, RefreshCw } from "lucide-react"
+import { Card, CardContent } from "@/components/ui/card"
+import { OeeFilterBar } from "@/components/oee/oee-filter-bar"
 import { PerformanceRateTable } from "@/components/oee/performance-rate-table"
-import { PerformanceRow } from "@/types/performance-types"
-
-import { saveAs } from "file-saver"
-import ExcelJS from "exceljs"
+import { useOeeMetrics } from "@/hooks/useOeeMetrics"
 
 export default function PerformanceRatePage() {
+  const {
+    dateFrom, setDateFrom, dateTo, setDateTo,
+    groupBy, setGroupBy, showDetail, setShowDetail,
+    rows, lines, loading, error, fetchData,
+  } = useOeeMetrics()
 
-  const [fromDate, setFromDate] = useState("")
-  const [toDate, setToDate] = useState("")
-  const [month, setMonth] = useState("")
-
-  const [exportOpen, setExportOpen] = useState(false)
-  const [exportStart, setExportStart] = useState("")
-  const [exportEnd, setExportEnd] = useState("")
-
-  const data: PerformanceRow[] = [
-    { date: "2026-03-01", line1: 99.94, line2: 96.40, line3: 100,   line4: 87.50, line5: 100,   line6: 77.30, allLine: 92.35 },
-    { date: "2026-03-02", line1: 100,   line2: 86.32, line3: 99.32, line4: 100,   line5: 99.67, line6: 100,   allLine: 100 },
-    { date: "2026-03-03", line1: 100,   line2: 100,   line3: 100,   line4: 100,   line5: 87.36, line6: 43.40, allLine: 91.52 },
-  ]
-
-  const filteredData = useMemo(() => {
-    let result = data
-    if (month) result = result.filter(row => row.date.startsWith(month))
-    if (fromDate) result = result.filter(row => row.date >= fromDate)
-    if (toDate) result = result.filter(row => row.date <= toDate)
-    return result
-  }, [data, fromDate, toDate, month])
-
-  async function exportExcel() {
-    if (!exportStart || !exportEnd) {
-      alert("Please select start date and end date")
-      return
-    }
-
-    const filtered = data.filter(d => d.date >= exportStart && d.date <= exportEnd)
-
-    const workbook = new ExcelJS.Workbook()
-    const sheet = workbook.addWorksheet("Performance Rate")
-
-    sheet.columns = [
-      { header: "Date", key: "date", width: 15 },
-      { header: "Line 1", key: "line1", width: 12 },
-      { header: "Line 2", key: "line2", width: 12 },
-      { header: "Line 3A & 3B", key: "line3", width: 14 },
-      { header: "Line 4", key: "line4", width: 12 },
-      { header: "Line 5", key: "line5", width: 12 },
-      { header: "Line 6A & 6B", key: "line6", width: 14 },
-      { header: "All Line", key: "allLine", width: 14 }
-    ]
-
-    sheet.getRow(1).eachCell(cell => {
-      cell.font = { bold: true, color: { argb: "FFFFFFFF" } }
-      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F4E78" } }
-      cell.alignment = { horizontal: "center", vertical: "middle" }
-    })
-
-    filtered.forEach(r => {
-      const row = sheet.addRow({
-        date: new Date(r.date).toLocaleDateString("id-ID"),
-        line1: r.line1,
-        line2: r.line2,
-        line3: r.line3,
-        line4: r.line4,
-        line5: r.line5,
-        line6: r.line6,
-        allLine: r.allLine
-      })
-      row.eachCell(cell => { cell.alignment = { horizontal: "center" } })
-    })
-
-    const buffer = await workbook.xlsx.writeBuffer()
-    saveAs(new Blob([buffer]), "performance-rate.xlsx")
-    setExportOpen(false)
-  }
+  const allPerf = rows.map(r => r.all_line.performance).filter((v): v is number => v !== null)
+  const avg = allPerf.length ? allPerf.reduce((a, b) => a + b, 0) / allPerf.length : null
+  const min = allPerf.length ? Math.min(...allPerf) : null
+  const max = allPerf.length ? Math.max(...allPerf) : null
+  const fmtPct = (v: number | null) => v === null ? "N/A" : `${v.toFixed(1)}%`
 
   return (
     <OeeGuard section="view">
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50/30">
-        {/* HERO */}
-        <div className="relative overflow-hidden bg-gradient-to-r from-emerald-800 via-emerald-700 to-teal-600 px-8 py-10">
+      <div className="min-h-screen bg-gradient-to-br from-violet-50 via-white to-purple-50/30">
+        <div className="relative overflow-hidden bg-gradient-to-r from-violet-800 via-violet-700 to-purple-600 px-8 py-10">
           <div className="absolute -top-8 -right-8 h-40 w-40 rounded-full bg-white/5" />
           <div className="relative flex items-center gap-4">
             <div className="h-14 w-14 rounded-2xl bg-white/15 backdrop-blur flex items-center justify-center">
@@ -112,59 +32,60 @@ export default function PerformanceRatePage() {
             <div>
               <p className="text-white/60 text-xs font-semibold uppercase tracking-widest mb-1">OEE Data View</p>
               <h1 className="text-3xl font-bold text-white tracking-tight">Performance Rate</h1>
-              <p className="text-white/70 text-sm mt-1">Persentase kinerja mesin</p>
+              <p className="text-white/70 text-sm mt-1">Actual Output ÷ Ideal Output × 100%</p>
             </div>
           </div>
         </div>
-        <div className="p-8 space-y-6">
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-emerald-900 flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-emerald-500 inline-block" />Filter
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-wrap items-end gap-6">
-              <div className="flex flex-col">
-                <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide">From Date</p>
-                <Input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} />
-              </div>
-              <div className="flex flex-col">
-                <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide">To Date</p>
-                <Input type="date" value={toDate} onChange={e => setToDate(e.target.value)} />
-              </div>
-              <div className="flex flex-col">
-                <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide">Monthly</p>
-                <Input type="month" value={month} onChange={e => setMonth(e.target.value)} />
-              </div>
-              <Button onClick={() => setExportOpen(true)}>Export Excel</Button>
+        <div className="p-6 space-y-6">
+          <OeeFilterBar
+            dateFrom={dateFrom} dateTo={dateTo} groupBy={groupBy}
+            showDetail={showDetail} loading={loading}
+            onDateFrom={setDateFrom} onDateTo={setDateTo} onGroupBy={setGroupBy}
+            onToggleDetail={() => setShowDetail(v => !v)} onFetch={fetchData}
+          />
+
+          {error && (
+            <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+              <AlertCircle className="h-4 w-4 shrink-0" />{error}
+            </div>
+          )}
+
+          {!loading && rows.length > 0 && (
+            <div className="grid grid-cols-3 gap-4">
+              {[
+                { label: "Rata-rata", value: fmtPct(avg), color: "text-violet-700" },
+                { label: "Minimum",  value: fmtPct(min), color: "text-red-600"    },
+                { label: "Maksimum", value: fmtPct(max), color: "text-purple-700" },
+              ].map(({ label, value, color }) => (
+                <Card key={label} className="border-0 shadow-sm">
+                  <CardContent className="p-4">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">{label} All Line</p>
+                    <p className={`text-2xl font-bold mt-1 ${color}`}>{value}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          {loading ? (
+            <div className="flex items-center justify-center h-48 border rounded-lg text-muted-foreground text-sm gap-2">
+              <RefreshCw className="h-4 w-4 animate-spin" />Menghitung performance rate...
+            </div>
+          ) : (
+            <PerformanceRateTable data={rows} lines={lines} showDetail={showDetail} />
+          )}
+
+          <Card className="border border-violet-100 bg-violet-50/40 shadow-none">
+            <CardContent className="p-4 text-xs text-violet-800 space-y-1">
+              <p className="font-semibold text-violet-900 mb-2">📐 Formula</p>
+              <p><span className="font-medium">Ideal Output</span> = Operating Time (jam) × Standard Throughput (unit/jam)</p>
+              <p><span className="font-medium">Actual Output</span> = Σ semua tipe output produksi</p>
+              <p><span className="font-medium">Performance Rate</span> = Actual Output ÷ Ideal Output × 100%</p>
+              <p><span className="font-medium">All Line</span> = Σ Actual semua line ÷ Σ Ideal semua line × 100%</p>
+              <p className="text-violet-600 mt-2">* Standard Throughput diambil dari master data per line + feed code</p>
             </CardContent>
           </Card>
-
-          <PerformanceRateTable data={filteredData} />
-
-          <Dialog open={exportOpen} onOpenChange={setExportOpen}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Export Performance Rate</DialogTitle>
-              </DialogHeader>
-              <div className="flex flex-col gap-4">
-                <div className="flex flex-col">
-                  <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide">Start Date</p>
-                  <Input type="date" value={exportStart} onChange={e => setExportStart(e.target.value)} />
-                </div>
-                <div className="flex flex-col">
-                  <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide">End Date</p>
-                  <Input type="date" value={exportEnd} onChange={e => setExportEnd(e.target.value)} />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setExportOpen(false)}>Cancel</Button>
-                <Button onClick={exportExcel}>Export</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-
         </div>
       </div>
     </OeeGuard>
