@@ -7,6 +7,7 @@ import {
   GaugeCircleIcon,
   FullscreenIcon,
   TreePine,
+  Wrench,
 } from 'lucide-react';
 import {
   OEE_MASTER_ROLES, OEE_INPUT_ROLES, OEE_VIEW_ROLES, EQUIPMENT_ROLES,
@@ -75,6 +76,13 @@ export const menuItems: MenuItem[] = [
 
   // ── Administration ────────────────────────────────────────────────────────
   {
+    title: 'Equipment',
+    href: '/equipment',
+    icon: Wrench,
+    roles: EQUIPMENT_ROLES,
+    description: 'Manajemen data & pohon peralatan',
+  },
+  {
     title: 'Users',
     href: '/users',
     icon: Users,
@@ -125,12 +133,13 @@ export function getMenuItemsForUser(
 
   // Map route href → module key
   const hrefToModule = (href: string): string => {
-    if (href.startsWith('/oee'))      return 'oee';
-    if (href.startsWith('/users'))    return 'users';
-    if (href.startsWith('/plants'))   return 'plants';
-    if (href.startsWith('/settings')) return 'settings';
-    if (href.startsWith('/dashboard'))return 'dashboard';
-    if (href.startsWith('/equipment'))  return 'equipment';
+    if (href.startsWith('/oee'))         return 'oee';
+    if (href.startsWith('/users'))       return 'users';
+    if (href.startsWith('/plants'))      return 'plants';
+    if (href.startsWith('/settings'))    return 'settings';
+    if (href.startsWith('/dashboard'))   return 'dashboard';
+    if (href.startsWith('/equipment'))   return 'equipment';
+    if (href.startsWith('/scm-turnover'))return 'scm-turnover';
     return '';
   };
 

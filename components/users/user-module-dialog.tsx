@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
-import { Loader2, LayoutDashboard, GaugeCircle, Users, Factory, Settings, Info, RefreshCw } from 'lucide-react'
+import { Loader2, LayoutDashboard, GaugeCircle, Users, Factory, Settings, Info, RefreshCw, Wrench, BarChart2 } from 'lucide-react'
 import { ApiUser } from '@/types/api'
 import { getUserModules, setUserModules } from '@/services/userService'
 import { toast } from 'sonner'
@@ -40,6 +40,20 @@ const ALL_MODULES: ModuleDef[] = [
     color: 'text-emerald-600',
   },
   {
+    key: 'scm-turnover',
+    label: 'Turnover Dashboard',
+    description: 'Dashboard SCM Turnover',
+    icon: BarChart2,
+    color: 'text-cyan-600',
+  },
+  {
+    key: 'equipment',
+    label: 'Equipment',
+    description: 'Manajemen data & pohon peralatan',
+    icon: Wrench,
+    color: 'text-orange-600',
+  },
+  {
     key: 'users',
     label: 'Users',
     description: 'Manajemen user & akses',
@@ -65,8 +79,8 @@ const ALL_MODULES: ModuleDef[] = [
 // ─── Role default modules (for display reference only) ────────────────────────
 
 const ROLE_DEFAULT_MODULES: Record<string, string[]> = {
-  administrator: ['dashboard', 'oee', 'users', 'plants', 'settings'],
-  plant_manager: ['dashboard', 'oee', 'settings'],
+  administrator: ['dashboard', 'oee', 'scm-turnover', 'equipment', 'users', 'plants', 'settings'],
+  plant_manager: ['dashboard', 'oee', 'scm-turnover', 'equipment', 'settings'],
   operator:      ['dashboard', 'oee', 'settings'],
   viewer:        ['dashboard', 'oee'],
 }
