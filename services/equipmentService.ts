@@ -5,8 +5,11 @@
 
 import { api } from '@/lib/api-client'
 import { API_BASE_URL } from '@/lib/api-config'
-import { ApiEquipmentTree, EquipmentStats, EquipmentCreatePayload, EquipmentUpdatePayload } from '@/types/equipment-types'
-
+import {
+  ApiEquipmentTree, EquipmentStats,
+  EquipmentCreatePayload, EquipmentUpdatePayload,
+  EquipmentPaginatedResponse,
+} from '@/types/equipment-types'
 
 const BASE = '/api/v1/equipment'
 
@@ -38,13 +41,37 @@ async function _uploadFile(url: string, file: File) {
   return data
 }
 
-// ─── Queries ──────────────────────────────────────────────────────────────────
+// ─── Params type (shared) ─────────────────────────────────────────────────────
+export interface EquipmentFilterParams {
+  sistem?:       string
+  sub_sistem?:   string
+  unit_mesin?:   string
+  bagian_mesin?: string
+  is_verified?:  boolean
+  search?:       string
+}
 
-export const getEquipment = (params?: {
-  sistem?: string; sub_sistem?: string; unit_mesin?: string
-  bagian_mesin?: string; is_verified?: boolean; search?: string
-  skip?: number; limit?: number
-}) => {
+// ─── Server-side paginated (TABLE VIEW) ───────────────────────────────────────
+// Fetch hanya data yang dibutuhkan per halaman — tidak load semua ke memori.
+
+export const getEquipmentPaginated = (
+  params: EquipmentFilterParams & { page: number; page_size: number }
+) => {
+  const q = new URLSearchParams()
+  if (params.sistem)       q.set('sistem',       params.sistem)
+  if (params.sub_sistem)   q.set('sub_sistem',   params.sub_sistem)
+  if (params.unit_mesin)   q.set('unit_mesin',   params.unit_mesin)
+  if (params.bagian_mesin) q.set('bagian_mesin', params.bagian_mesin)
+  if (params.is_verified !== undefined) q.set('is_verified', String(params.is_verified))
+  if (params.search)       q.set('search',       params.search)
+  q.set('page',      String(params.page))
+  q.set('page_size', String(params.page_size))
+  return api.get<EquipmentPaginatedResponse>(`${BASE}/paginated?${q.toString()}`)
+}
+
+// ─── Full list (TREE VIEW — load semua, dengan filter & limit) ────────────────
+
+export const getEquipment = (params?: EquipmentFilterParams & { skip?: number; limit?: number }) => {
   const q = new URLSearchParams()
   if (params?.sistem)       q.set('sistem',       params.sistem)
   if (params?.sub_sistem)   q.set('sub_sistem',   params.sub_sistem)
@@ -74,12 +101,8 @@ export const deleteEquipment = (id: number) =>
 
 // ─── Verifikasi ───────────────────────────────────────────────────────────────
 
-export const verifyEquipment = (id: number) =>
-  api.post<ApiEquipmentTree>(`${BASE}/${id}/verify`, {})
-
-export const unverifyEquipment = (id: number) =>
-  api.post<ApiEquipmentTree>(`${BASE}/${id}/unverify`, {})
-
+export const verifyEquipment   = (id: number) => api.post<ApiEquipmentTree>(`${BASE}/${id}/verify`, {})
+export const unverifyEquipment = (id: number) => api.post<ApiEquipmentTree>(`${BASE}/${id}/unverify`, {})
 export const verifyBulk = (ids: number[], action: 'verify' | 'unverify') =>
   api.post<{ updated: number; action: string }>(`${BASE}/verify-bulk`, { ids, action })
 
@@ -91,5 +114,4 @@ export const exportEquipment = (isVerified?: boolean) =>
     `equipment_tree_${Date.now()}.xlsx`,
   )
 
-export const importEquipment = (file: File) =>
-  _uploadFile(`${BASE}/import`, file)
+export const importEquipment = (file: File) => _uploadFile(`${BASE}/import`, file)

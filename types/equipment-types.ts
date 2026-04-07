@@ -54,3 +54,12 @@ export interface EquipmentNode {
   verified: number
   total:    number
 }
+
+// ─── Paginated response ───────────────────────────────────────────────────────
+export interface EquipmentPaginatedResponse {
+  data:        ApiEquipmentTree[]
+  total:       number
+  page:        number
+  page_size:   number
+  total_pages: number
+}
