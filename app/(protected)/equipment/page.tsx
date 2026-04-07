@@ -1,11 +1,11 @@
 "use client"
 
-import { useState, useEffect, useCallback, useMemo } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { useAuth } from "@/lib/auth-context"
 import { canAccessEquipment } from "@/lib/oee-access"
 import { ShieldOff, TreePine, Search, Plus, Upload, Download, CheckCircle2,
          Clock, ChevronRight, ChevronDown, Pencil, Trash2, ShieldCheck,
-         ShieldX, RefreshCw, AlertCircle, Filter, X } from "lucide-react"
+         ShieldX, RefreshCw, AlertCircle, Filter, X, ChevronsUpDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -18,15 +18,11 @@ import {
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
-import {
-  getEquipment, getEquipmentStats, createEquipment, updateEquipment,
-  deleteEquipment, verifyEquipment, unverifyEquipment, verifyBulk,
-  exportEquipment, importEquipment,
-} from "@/services/equipmentService"
-import {
-  ApiEquipmentTree, EquipmentStats, EquipmentCreatePayload,
-} from "@/types/equipment-types"
+
+
 import { toast } from "sonner"
+import { ApiEquipmentTree, EquipmentCreatePayload, EquipmentStats } from "@/types/equipment-types"
+import { getEquipment, getEquipmentStats, updateEquipment, createEquipment, deleteEquipment, verifyEquipment, unverifyEquipment, verifyBulk, importEquipment, exportEquipment } from "@/services/equipmentService"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -56,7 +52,6 @@ function buildTree(rows: ApiEquipmentTree[]) {
     const ss = r.sub_sistem  ?? ""
     const u  = r.unit_mesin  ?? ""
     const b  = r.bagian_mesin ?? ""
-    const sp = r.spare_part  ?? ""
 
     if (!root.has(s)) root.set(s, { label: s, children: new Map(), rows: [], level: "sistem" })
     const sNode = root.get(s)!
@@ -82,6 +77,157 @@ function buildTree(rows: ApiEquipmentTree[]) {
 const EMPTY_FORM: EquipmentCreatePayload = {
   sistem: "", sub_sistem: "", unit_mesin: "", bagian_mesin: "",
   spare_part: "", spesifikasi: "", sku: "", bu: "", remarks: "",
+}
+
+// ─── DropdownSearch Component ─────────────────────────────────────────────────
+interface DropdownSearchProps {
+  value: string
+  onChange: (val: string) => void
+  options: string[]
+  placeholder?: string
+}
+
+function DropdownSearch({ value, onChange, options, placeholder }: DropdownSearchProps) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState("")
+  const containerRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false)
+        setQuery("")
+      }
+    }
+    document.addEventListener("mousedown", handler)
+    return () => document.removeEventListener("mousedown", handler)
+  }, [])
+
+  const filtered = useMemo(() => {
+    if (!query) return options
+    return options.filter(o => o.toLowerCase().includes(query.toLowerCase()))
+  }, [options, query])
+
+  const showCreateNew = query.trim() !== "" &&
+    !options.some(o => o.toLowerCase() === query.toLowerCase())
+
+  function handleSelect(val: string) {
+    onChange(val)
+    setOpen(false)
+    setQuery("")
+  }
+
+  function handleCreateNew() {
+    onChange(query.trim())
+    setOpen(false)
+    setQuery("")
+  }
+
+  function handleClear(e: React.MouseEvent) {
+    e.stopPropagation()
+    onChange("")
+    setQuery("")
+  }
+
+  return (
+    <div ref={containerRef} className="relative">
+      {/* Trigger button */}
+      <button
+        type="button"
+        onClick={() => {
+          setOpen(v => !v)
+          setTimeout(() => inputRef.current?.focus(), 50)
+        }}
+        className={cn(
+          "w-full flex items-center justify-between gap-2 h-8 px-3 rounded-md border text-sm transition-colors",
+          "bg-white hover:bg-slate-50 border-input",
+          open && "ring-2 ring-blue-500 ring-offset-0 border-blue-500"
+        )}
+      >
+        <span className={cn("truncate text-left flex-1", !value && "text-muted-foreground")}>
+          {value || placeholder || "Pilih atau ketik..."}
+        </span>
+        <div className="flex items-center gap-1 shrink-0">
+          {value && (
+            <span
+              onClick={handleClear}
+              className="h-4 w-4 text-slate-400 hover:text-slate-600 cursor-pointer flex items-center justify-center"
+            >
+              <X className="h-3 w-3" />
+            </span>
+          )}
+          <ChevronsUpDown className="h-3.5 w-3.5 text-muted-foreground" />
+        </div>
+      </button>
+
+      {/* Dropdown panel */}
+      {open && (
+        <div className="absolute z-50 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-md shadow-lg overflow-hidden">
+          {/* Search input inside dropdown */}
+          <div className="p-2 border-b">
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <input
+                ref={inputRef}
+                type="text"
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                placeholder="Cari atau ketik nama baru..."
+                className="w-full pl-7 pr-2 py-1.5 text-xs border rounded-md bg-slate-50 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+              {query && (
+                <button
+                  onClick={() => setQuery("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Option list */}
+          <div className="max-h-44 overflow-y-auto">
+            {filtered.length === 0 && !showCreateNew && (
+              <div className="px-3 py-4 text-xs text-center text-muted-foreground">
+                Tidak ada pilihan tersedia
+              </div>
+            )}
+
+            {filtered.map(opt => (
+              <button
+                key={opt}
+                type="button"
+                onClick={() => handleSelect(opt)}
+                className={cn(
+                  "w-full text-left px-3 py-2 text-xs hover:bg-blue-50 transition-colors",
+                  value === opt && "bg-blue-50 text-blue-700 font-medium"
+                )}
+              >
+                {opt}
+              </button>
+            ))}
+
+            {/* Add new option */}
+            {showCreateNew && (
+              <>
+                {filtered.length > 0 && <div className="border-t" />}
+                <button
+                  type="button"
+                  onClick={handleCreateNew}
+                  className="w-full text-left px-3 py-2 text-xs hover:bg-emerald-50 transition-colors flex items-center gap-2 text-emerald-700 font-medium"
+                >
+                  <Plus className="h-3 w-3 shrink-0" />
+                  Tambah baru: &ldquo;{query.trim()}&rdquo;
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 
 // ─── Guard ────────────────────────────────────────────────────────────────────
@@ -121,7 +267,6 @@ function TreeNode({
 
   return (
     <div className={cn("border-l-2 ml-4", depth === 0 ? "border-blue-200 ml-0" : "border-slate-200")}>
-      {/* Node header */}
       <div
         className={cn(
           "flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors group",
@@ -147,7 +292,6 @@ function TreeNode({
         )}
       </div>
 
-      {/* Children */}
       {open && (
         <div className="ml-4">
           {[...children.entries()].map(([key, node]) => (
@@ -159,7 +303,6 @@ function TreeNode({
             />
           ))}
 
-          {/* Spare part rows */}
           {rows.map(r => (
             <div
               key={r.id}
@@ -235,17 +378,13 @@ export default function EquipmentPage() {
   const [viewMode,   setViewMode]   = useState<"tree"|"table">("tree")
   const [selected,   setSelected]   = useState<Set<number>>(new Set())
 
-  // Form dialog
   const [formOpen,   setFormOpen]   = useState(false)
   const [editing,    setEditing]    = useState<ApiEquipmentTree | null>(null)
   const [form,       setForm]       = useState<EquipmentCreatePayload>(EMPTY_FORM)
   const [formError,  setFormError]  = useState("")
   const [isSaving,   setIsSaving]   = useState(false)
-
-  // Delete confirm
   const [deleteId,   setDeleteId]   = useState<number | null>(null)
 
-  // Fetch
   const fetchData = useCallback(async () => {
     setLoading(true); setError(null)
     try {
@@ -257,12 +396,60 @@ export default function EquipmentPage() {
     } catch (e: any) {
       setError(e.message ?? "Gagal memuat data")
     } finally {
-      setLoading(false) }
+      setLoading(false)
+    }
   }, [])
 
   useEffect(() => { fetchData() }, [fetchData])
 
-  // Filtered rows
+  // ── Unique options per hierarchy level (cascading) ───────────────────────
+  const sistemOptions = useMemo(() =>
+    [...new Set(rows.map(r => r.sistem).filter(Boolean))].sort() as string[]
+  , [rows])
+
+  const subSistemOptions = useMemo(() => {
+    const base = rows
+      .filter(r => !form.sistem || r.sistem === form.sistem)
+      .map(r => r.sub_sistem).filter(Boolean) as string[]
+    return [...new Set(base)].sort()
+  }, [rows, form.sistem])
+
+  const unitMesinOptions = useMemo(() => {
+    const base = rows
+      .filter(r => {
+        if (form.sistem && r.sistem !== form.sistem) return false
+        if (form.sub_sistem && r.sub_sistem !== form.sub_sistem) return false
+        return true
+      })
+      .map(r => r.unit_mesin).filter(Boolean) as string[]
+    return [...new Set(base)].sort()
+  }, [rows, form.sistem, form.sub_sistem])
+
+  const bagianMesinOptions = useMemo(() => {
+    const base = rows
+      .filter(r => {
+        if (form.sistem && r.sistem !== form.sistem) return false
+        if (form.sub_sistem && r.sub_sistem !== form.sub_sistem) return false
+        if (form.unit_mesin && r.unit_mesin !== form.unit_mesin) return false
+        return true
+      })
+      .map(r => r.bagian_mesin).filter(Boolean) as string[]
+    return [...new Set(base)].sort()
+  }, [rows, form.sistem, form.sub_sistem, form.unit_mesin])
+
+  const sparePartOptions = useMemo(() => {
+    const base = rows
+      .filter(r => {
+        if (form.sistem && r.sistem !== form.sistem) return false
+        if (form.sub_sistem && r.sub_sistem !== form.sub_sistem) return false
+        if (form.unit_mesin && r.unit_mesin !== form.unit_mesin) return false
+        if (form.bagian_mesin && r.bagian_mesin !== form.bagian_mesin) return false
+        return true
+      })
+      .map(r => r.spare_part).filter(Boolean) as string[]
+    return [...new Set(base)].sort()
+  }, [rows, form.sistem, form.sub_sistem, form.unit_mesin, form.bagian_mesin])
+
   const filtered = useMemo(() => {
     let r = rows
     if (filterVerified === "verified") r = r.filter(x => x.is_verified)
@@ -277,21 +464,35 @@ export default function EquipmentPage() {
 
   const tree = useMemo(() => buildTree(filtered), [filtered])
 
-  // Selection
   function toggleSelect(id: number, checked: boolean) {
     setSelected(prev => { const s = new Set(prev); checked ? s.add(id) : s.delete(id); return s })
   }
   function selectAll()   { setSelected(new Set(filtered.map(r => r.id))) }
   function clearSelect() { setSelected(new Set()) }
 
-  // Form
   function openAdd()  { setEditing(null); setForm(EMPTY_FORM); setFormError(""); setFormOpen(true) }
   function openEdit(r: ApiEquipmentTree) {
     setEditing(r)
-    setForm({ sistem: r.sistem, sub_sistem: r.sub_sistem ?? "", unit_mesin: r.unit_mesin ?? "",
-              bagian_mesin: r.bagian_mesin ?? "", spare_part: r.spare_part ?? "",
-              spesifikasi: r.spesifikasi ?? "", sku: r.sku ?? "", bu: r.bu ?? "", remarks: r.remarks ?? "" })
+    setForm({
+      sistem: r.sistem, sub_sistem: r.sub_sistem ?? "", unit_mesin: r.unit_mesin ?? "",
+      bagian_mesin: r.bagian_mesin ?? "", spare_part: r.spare_part ?? "",
+      spesifikasi: r.spesifikasi ?? "", sku: r.sku ?? "", bu: r.bu ?? "", remarks: r.remarks ?? ""
+    })
     setFormError(""); setFormOpen(true)
+  }
+
+  // Cascading change handlers: reset children when parent changes
+  function handleSistemChange(val: string) {
+    setForm(f => ({ ...f, sistem: val, sub_sistem: "", unit_mesin: "", bagian_mesin: "", spare_part: "" }))
+  }
+  function handleSubSistemChange(val: string) {
+    setForm(f => ({ ...f, sub_sistem: val, unit_mesin: "", bagian_mesin: "", spare_part: "" }))
+  }
+  function handleUnitMesinChange(val: string) {
+    setForm(f => ({ ...f, unit_mesin: val, bagian_mesin: "", spare_part: "" }))
+  }
+  function handleBagianMesinChange(val: string) {
+    setForm(f => ({ ...f, bagian_mesin: val, spare_part: "" }))
   }
 
   async function handleSave() {
@@ -400,8 +601,6 @@ export default function EquipmentPage() {
         <Card className="border-0 shadow-sm">
           <CardContent className="p-4">
             <div className="flex flex-wrap items-center gap-3">
-
-              {/* Search */}
               <div className="relative flex-1 min-w-[200px] max-w-xs">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -416,7 +615,6 @@ export default function EquipmentPage() {
                 )}
               </div>
 
-              {/* Filter verified */}
               <Select value={filterVerified} onValueChange={v => setFilterVerified(v as any)}>
                 <SelectTrigger className="h-8 w-32 text-xs">
                   <SelectValue />
@@ -428,7 +626,6 @@ export default function EquipmentPage() {
                 </SelectContent>
               </Select>
 
-              {/* View toggle */}
               <div className="flex rounded-md border overflow-hidden">
                 {(["tree","table"] as const).map(m => (
                   <button key={m} onClick={() => setViewMode(m)}
@@ -444,7 +641,6 @@ export default function EquipmentPage() {
                 Refresh
               </Button>
 
-              {/* Bulk actions */}
               {selected.size > 0 && isAdmin && (
                 <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 rounded-lg border border-blue-200">
                   <span className="text-xs text-blue-700 font-medium">{selected.size} dipilih</span>
@@ -463,7 +659,6 @@ export default function EquipmentPage() {
               )}
 
               <div className="ml-auto flex items-center gap-2">
-                {/* Select all */}
                 {isAdmin && filtered.length > 0 && (
                   <Button size="sm" variant="outline" className="h-8 text-xs"
                     onClick={selected.size === filtered.length ? clearSelect : selectAll}>
@@ -471,13 +666,11 @@ export default function EquipmentPage() {
                   </Button>
                 )}
 
-                {/* Export */}
                 <Button size="sm" variant="outline" className="h-8 gap-1.5"
                   onClick={() => exportEquipment()}>
                   <Download className="h-3.5 w-3.5" />Export
                 </Button>
 
-                {/* Import */}
                 {isAdmin && (
                   <label className="cursor-pointer">
                     <Button size="sm" variant="outline" className="h-8 gap-1.5" asChild>
@@ -487,7 +680,6 @@ export default function EquipmentPage() {
                   </label>
                 )}
 
-                {/* Add */}
                 {isAdmin && (
                   <Button size="sm" onClick={openAdd}
                     className="h-8 gap-1.5 bg-blue-600 hover:bg-blue-700 text-white">
@@ -499,14 +691,12 @@ export default function EquipmentPage() {
           </CardContent>
         </Card>
 
-        {/* Error */}
         {error && (
           <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
             <AlertCircle className="h-4 w-4 shrink-0" />{error}
           </div>
         )}
 
-        {/* Tree / Table View */}
         <Card className="border border-slate-200 shadow-sm overflow-hidden">
           <CardHeader className="pb-3 border-b">
             <div className="flex items-center justify-between">
@@ -530,7 +720,6 @@ export default function EquipmentPage() {
                 {search || filterVerified !== "all" ? "Tidak ada data yang cocok dengan filter." : "Belum ada data equipment."}
               </div>
             ) : viewMode === "tree" ? (
-              /* ── TREE VIEW ── */
               <div className="p-4 space-y-1 max-h-[600px] overflow-y-auto">
                 {[...tree.entries()].map(([key, node]) => (
                   <TreeNode
@@ -543,7 +732,6 @@ export default function EquipmentPage() {
                 ))}
               </div>
             ) : (
-              /* ── TABLE VIEW ── */
               <div className="overflow-auto max-h-[600px]">
                 <table className="w-full text-sm min-w-[900px]">
                   <thead className="bg-slate-50 sticky top-0 z-10">
@@ -612,19 +800,72 @@ export default function EquipmentPage() {
           </DialogHeader>
 
           <div className="space-y-3 py-2">
-            {(["sistem","sub_sistem","unit_mesin","bagian_mesin","spare_part"] as const).map(field => (
-              <div key={field}>
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-600 mb-1">
-                  {LEVEL_LABELS[field]}{field === "sistem" ? " *" : ""}
-                </p>
-                <Input
-                  value={(form as any)[field] ?? ""}
-                  onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))}
-                  placeholder={LEVEL_LABELS[field]}
-                  className="h-8 text-sm"
-                />
-              </div>
-            ))}
+
+            {/* Info banner */}
+            <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700">
+              <Search className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+              <span>
+                Pilih dari daftar yang tersedia, atau ketik nama baru untuk menambahkan entri baru.
+                Memilih level atas akan memfilter pilihan level di bawahnya.
+              </span>
+            </div>
+
+            {/* Sistem */}
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-600 mb-1">
+                Sistem <span className="text-red-500">*</span>
+              </p>
+              <DropdownSearch
+                value={form.sistem}
+                onChange={handleSistemChange}
+                options={sistemOptions}
+                placeholder="Pilih atau tambah sistem..."
+              />
+            </div>
+
+            {/* Sub Sistem */}
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-600 mb-1">Sub Sistem</p>
+              <DropdownSearch
+                value={form.sub_sistem ?? ""}
+                onChange={handleSubSistemChange}
+                options={subSistemOptions}
+                placeholder="Pilih atau tambah sub sistem..."
+              />
+            </div>
+
+            {/* Unit Mesin */}
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-600 mb-1">Unit Mesin</p>
+              <DropdownSearch
+                value={form.unit_mesin ?? ""}
+                onChange={handleUnitMesinChange}
+                options={unitMesinOptions}
+                placeholder="Pilih atau tambah unit mesin..."
+              />
+            </div>
+
+            {/* Bagian Mesin */}
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-600 mb-1">Bagian Mesin</p>
+              <DropdownSearch
+                value={form.bagian_mesin ?? ""}
+                onChange={handleBagianMesinChange}
+                options={bagianMesinOptions}
+                placeholder="Pilih atau tambah bagian mesin..."
+              />
+            </div>
+
+            {/* Spare Part */}
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-600 mb-1">Spare Part</p>
+              <DropdownSearch
+                value={form.spare_part ?? ""}
+                onChange={val => setForm(f => ({ ...f, spare_part: val }))}
+                options={sparePartOptions}
+                placeholder="Pilih atau tambah spare part..."
+              />
+            </div>
 
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-600 mb-1">Spesifikasi</p>
