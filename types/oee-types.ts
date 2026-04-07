@@ -58,15 +58,3 @@ export interface OeeParams {
   group_by?: "daily" | "monthly"
   line_ids?: number[]
 }
-
-export interface AvailabilityLineView {
-  operating_h: number | null
-  loading_h: number | null
-  rate: number | null
-}
-
-export interface AvailabilityRow {
-  date: string
-  lines: Record<number, AvailabilityLineView | undefined>
-  all_line: number | null
-}
