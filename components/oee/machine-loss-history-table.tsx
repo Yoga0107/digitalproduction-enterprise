@@ -1,13 +1,18 @@
 'use client'
 
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Loader2, Pencil, Trash2, Eye, WrenchIcon } from 'lucide-react'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
+import { Loader2, Pencil, Trash2, Eye, WrenchIcon, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'
 import { ApiMachineLossInput } from '@/types/api'
 import { fmtDate, fmtMinutes } from '@/lib/machine-loss-utils'
 import { cn } from '@/lib/utils'
+
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100]
 
 type Props = {
   rows:      ApiMachineLossInput[]
@@ -20,6 +25,22 @@ type Props = {
 export function MachineLossHistoryTable({ rows, isLoading, onEdit, onDelete, onView }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const drag = useRef({ active: false, startX: 0, startY: 0, scrollLeft: 0, scrollTop: 0 })
+
+  const [page,     setPage]     = useState(1)
+  const [pageSize, setPageSize] = useState(25)
+
+  const totalPages  = Math.max(1, Math.ceil(rows.length / pageSize))
+  const safePage    = Math.min(page, totalPages)
+  const startIdx    = (safePage - 1) * pageSize
+  const pageRows    = rows.slice(startIdx, startIdx + pageSize)
+  const startItem   = rows.length === 0 ? 0 : startIdx + 1
+  const endItem     = Math.min(startIdx + pageSize, rows.length)
+
+  // Reset ke page 1 saat pageSize berubah
+  function handlePageSize(val: string) {
+    setPageSize(Number(val))
+    setPage(1)
+  }
 
   function onMouseDown(e: React.MouseEvent<HTMLDivElement>) {
     const el = scrollRef.current; if (!el) return
@@ -42,15 +63,35 @@ export function MachineLossHistoryTable({ rows, isLoading, onEdit, onDelete, onV
   return (
     <Card className="border border-slate-200 shadow-sm overflow-hidden">
       <CardHeader className="pb-3 bg-white border-b border-slate-100">
-        <CardTitle className="text-base flex items-center gap-2">
-          <WrenchIcon className="h-4 w-4 text-teal-600" />
-          Riwayat Machine Loss
-          {!isLoading && (
-            <Badge className="bg-teal-100 text-teal-800 hover:bg-teal-100 ml-1">
-              {rows.length} record
-            </Badge>
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <CardTitle className="text-base flex items-center gap-2">
+            <WrenchIcon className="h-4 w-4 text-teal-600" />
+            Riwayat Machine Loss
+            {!isLoading && (
+              <Badge className="bg-teal-100 text-teal-800 hover:bg-teal-100 ml-1">
+                {rows.length} record
+              </Badge>
+            )}
+          </CardTitle>
+
+          {/* Page size selector */}
+          {!isLoading && rows.length > 0 && (
+            <div className="flex items-center gap-2 text-xs text-slate-500">
+              <span>Tampilkan</span>
+              <Select value={String(pageSize)} onValueChange={handlePageSize}>
+                <SelectTrigger className="h-7 w-16 text-xs px-2">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PAGE_SIZE_OPTIONS.map(n => (
+                    <SelectItem key={n} value={String(n)} className="text-xs">{n}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <span>data per halaman</span>
+            </div>
           )}
-        </CardTitle>
+        </div>
       </CardHeader>
 
       <CardContent className="p-0">
@@ -63,162 +104,243 @@ export function MachineLossHistoryTable({ rows, isLoading, onEdit, onDelete, onV
             Belum ada data tersedia.
           </div>
         ) : (
-          <div
-            ref={scrollRef}
-            className="overflow-auto max-h-[520px] cursor-grab select-none"
-            onMouseDown={onMouseDown}
-            onMouseMove={onMouseMove}
-            onMouseUp={onMouseUpLeave}
-            onMouseLeave={onMouseUpLeave}
-          >
-            <table className="w-full text-sm border-collapse min-w-[1040px]">
-              {/* ── HEAD ──────────────────────────────────────────────────── */}
-              <thead>
-                <tr className="bg-white text-black">
-                  {/* Sticky: Date */}
-                  <th className="sticky left-0 z-20 bg-white text-left px-4 py-3 text-xs font-semibold whitespace-nowrap border-r border-slate-700 min-w-[130px]">
-                    Tanggal
-                  </th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold whitespace-nowrap min-w-[120px]">Line</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold whitespace-nowrap min-w-[100px]">Shift</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold whitespace-nowrap min-w-[110px]">Kode Pakan</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold whitespace-nowrap min-w-[160px]">
-                    <span className="flex items-center gap-1.5">
-                      <span className="px-1.5 py-0.5 rounded bg-red-500/30 text-black text-[10px] font-bold">L1</span>
-                      Kategori Utama
-                    </span>
-                  </th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold whitespace-nowrap min-w-[160px]">
-                    <span className="flex items-center gap-1.5">
-                      <span className="px-1.5 py-0.5 rounded bg-violet-500/30 text-black text-[10px] font-bold">L2</span>
-                      Sub-Kategori
-                    </span>
-                  </th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold whitespace-nowrap min-w-[160px]">
-                    <span className="flex items-center gap-1.5">
-                      <span className="px-1.5 py-0.5 rounded bg-emerald-500/30 text-black text-[10px] font-bold">L3</span>
-                      Detail Kerugian
-                    </span>
-                  </th>
-                  <th className="text-center px-4 py-3 text-xs font-semibold whitespace-nowrap min-w-[80px]">Mulai</th>
-                  <th className="text-center px-4 py-3 text-xs font-semibold whitespace-nowrap min-w-[80px]">Selesai</th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold whitespace-nowrap min-w-[90px]">Durasi</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold min-w-[130px]">Keterangan</th>
-                  {/* Sticky: Actions */}
-                  <th className="sticky right-0 z-20 bg-white px-4 py-3 text-center text-xs font-semibold whitespace-nowrap border-l border-slate-700 min-w-[100px]">
-                    Aksi
-                  </th>
-                </tr>
-              </thead>
+          <>
+            {/* ── TABLE ─────────────────────────────────────────────────── */}
+            <div
+              ref={scrollRef}
+              className="overflow-auto max-h-[520px] cursor-grab select-none"
+              onMouseDown={onMouseDown}
+              onMouseMove={onMouseMove}
+              onMouseUp={onMouseUpLeave}
+              onMouseLeave={onMouseUpLeave}
+            >
+              <table className="w-full text-sm border-collapse min-w-[1040px]">
+                <thead>
+                  <tr className="bg-white text-black">
+                    <th className="sticky left-0 z-20 bg-white text-left px-4 py-3 text-xs font-semibold whitespace-nowrap border-r border-slate-700 min-w-[130px]">
+                      Tanggal
+                    </th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold whitespace-nowrap min-w-[120px]">Line</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold whitespace-nowrap min-w-[100px]">Shift</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold whitespace-nowrap min-w-[110px]">Kode Pakan</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold whitespace-nowrap min-w-[160px]">
+                      <span className="flex items-center gap-1.5">
+                        <span className="px-1.5 py-0.5 rounded bg-red-500/30 text-black text-[10px] font-bold">L1</span>
+                        Kategori Utama
+                      </span>
+                    </th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold whitespace-nowrap min-w-[160px]">
+                      <span className="flex items-center gap-1.5">
+                        <span className="px-1.5 py-0.5 rounded bg-violet-500/30 text-black text-[10px] font-bold">L2</span>
+                        Sub-Kategori
+                      </span>
+                    </th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold whitespace-nowrap min-w-[160px]">
+                      <span className="flex items-center gap-1.5">
+                        <span className="px-1.5 py-0.5 rounded bg-emerald-500/30 text-black text-[10px] font-bold">L3</span>
+                        Detail Kerugian
+                      </span>
+                    </th>
+                    <th className="text-center px-4 py-3 text-xs font-semibold whitespace-nowrap min-w-[80px]">Mulai</th>
+                    <th className="text-center px-4 py-3 text-xs font-semibold whitespace-nowrap min-w-[80px]">Selesai</th>
+                    <th className="text-right px-4 py-3 text-xs font-semibold whitespace-nowrap min-w-[90px]">Durasi</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold min-w-[130px]">Keterangan</th>
+                    <th className="sticky right-0 z-20 bg-white px-4 py-3 text-center text-xs font-semibold whitespace-nowrap border-l border-slate-700 min-w-[100px]">
+                      Aksi
+                    </th>
+                  </tr>
+                </thead>
 
-              {/* ── BODY ──────────────────────────────────────────────────── */}
-              <tbody>
-                {rows.map((r, i) => {
-                  const isEven = i % 2 === 0
-                  const rowBg  = isEven ? 'bg-white' : 'bg-slate-50'
-                  return (
-                    <tr
-                      key={r.id}
-                      className={cn(
-                        'border-b border-slate-100 hover:bg-teal-50 transition-colors cursor-pointer group',
-                        rowBg,
-                      )}
-                      onClick={() => onView?.(r)}
-                    >
-                      {/* Sticky: Date — must match row bg exactly */}
-                      <td className={cn(
-                        'sticky left-0 z-10 border-r border-slate-200 px-4 py-3 font-medium whitespace-nowrap',
-                        'group-hover:bg-teal-50',
-                        isEven ? 'bg-white' : 'bg-slate-50',
-                      )}>
-                        {fmtDate(r.date)}
-                      </td>
-
-                      <td className="px-4 py-3 whitespace-nowrap text-slate-700">{r.line_name ?? '—'}</td>
-
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <Badge variant="outline" className="text-xs font-medium">{r.shift_name ?? '—'}</Badge>
-                      </td>
-
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        {r.feed_code_code
-                          ? <Badge className="bg-blue-100 text-blue-700 border border-blue-200 hover:bg-blue-100 text-xs font-mono">{r.feed_code_code}</Badge>
-                          : <span className="text-slate-300 text-xs">—</span>}
-                      </td>
-
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        {r.loss_l1_name
-                          ? <Badge className="bg-red-100 text-red-700 border border-red-200 hover:bg-red-100 text-xs font-medium">{r.loss_l1_name}</Badge>
-                          : <span className="text-slate-300 text-xs">—</span>}
-                      </td>
-
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        {r.loss_l2_name
-                          ? <Badge className="bg-violet-100 text-violet-700 border border-violet-200 hover:bg-violet-100 text-xs font-medium">{r.loss_l2_name}</Badge>
-                          : <span className="text-slate-300 text-xs">—</span>}
-                      </td>
-
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        {r.loss_l3_name
-                          ? <Badge className="bg-emerald-100 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 text-xs font-medium">{r.loss_l3_name}</Badge>
-                          : <span className="text-slate-300 text-xs">—</span>}
-                      </td>
-
-                      <td className="px-4 py-3 text-center font-mono text-xs text-slate-600">{r.time_from ?? '—'}</td>
-                      <td className="px-4 py-3 text-center font-mono text-xs text-slate-600">{r.time_to   ?? '—'}</td>
-
-                      <td className="px-4 py-3 text-right whitespace-nowrap">
-                        <span className="text-sm font-bold text-orange-600 tabular-nums">
-                          {fmtMinutes(r.duration_minutes)}
-                        </span>
-                      </td>
-
-                      <td className="px-4 py-3 text-xs text-slate-500 max-w-[130px] truncate">
-                        {r.remarks || <span className="text-slate-300">—</span>}
-                      </td>
-
-                      {/* Sticky: Actions — fully opaque, matches row background */}
-                      <td
+                <tbody>
+                  {pageRows.map((r, i) => {
+                    const isEven = i % 2 === 0
+                    const rowBg  = isEven ? 'bg-white' : 'bg-slate-50'
+                    return (
+                      <tr
+                        key={r.id}
                         className={cn(
-                          'sticky right-0 z-10 border-l border-slate-200 px-3 py-2.5',
+                          'border-b border-slate-100 hover:bg-teal-50 transition-colors cursor-pointer group',
+                          rowBg,
+                        )}
+                        onClick={() => onView?.(r)}
+                      >
+                        <td className={cn(
+                          'sticky left-0 z-10 border-r border-slate-200 px-4 py-3 font-medium whitespace-nowrap',
                           'group-hover:bg-teal-50',
                           isEven ? 'bg-white' : 'bg-slate-50',
+                        )}>
+                          {fmtDate(r.date)}
+                        </td>
+
+                        <td className="px-4 py-3 whitespace-nowrap text-slate-700">{r.line_name ?? '—'}</td>
+
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <Badge variant="outline" className="text-xs font-medium">{r.shift_name ?? '—'}</Badge>
+                        </td>
+
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {r.feed_code_code
+                            ? <Badge className="bg-blue-100 text-blue-700 border border-blue-200 hover:bg-blue-100 text-xs font-mono">{r.feed_code_code}</Badge>
+                            : <span className="text-slate-300 text-xs">—</span>}
+                        </td>
+
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {r.loss_l1_name
+                            ? <Badge className="bg-red-100 text-red-700 border border-red-200 hover:bg-red-100 text-xs font-medium">{r.loss_l1_name}</Badge>
+                            : <span className="text-slate-300 text-xs">—</span>}
+                        </td>
+
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {r.loss_l2_name
+                            ? <Badge className="bg-violet-100 text-violet-700 border border-violet-200 hover:bg-violet-100 text-xs font-medium">{r.loss_l2_name}</Badge>
+                            : <span className="text-slate-300 text-xs">—</span>}
+                        </td>
+
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {r.loss_l3_name
+                            ? <Badge className="bg-emerald-100 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 text-xs font-medium">{r.loss_l3_name}</Badge>
+                            : <span className="text-slate-300 text-xs">—</span>}
+                        </td>
+
+                        <td className="px-4 py-3 text-center font-mono text-xs text-slate-600">{r.time_from ?? '—'}</td>
+                        <td className="px-4 py-3 text-center font-mono text-xs text-slate-600">{r.time_to   ?? '—'}</td>
+
+                        <td className="px-4 py-3 text-right whitespace-nowrap">
+                          <span className="text-sm font-bold text-orange-600 tabular-nums">
+                            {fmtMinutes(r.duration_minutes)}
+                          </span>
+                        </td>
+
+                        <td className="px-4 py-3 text-xs text-slate-500 max-w-[130px] truncate">
+                          {r.remarks || <span className="text-slate-300">—</span>}
+                        </td>
+
+                        <td
+                          className={cn(
+                            'sticky right-0 z-10 border-l border-slate-200 px-3 py-2.5',
+                            'group-hover:bg-teal-50',
+                            isEven ? 'bg-white' : 'bg-slate-50',
+                          )}
+                          onClick={e => e.stopPropagation()}
+                        >
+                          <div className="flex justify-center items-center gap-0.5">
+                            <Button
+                              size="sm" variant="ghost"
+                              className="h-7 w-7 p-0 text-slate-400 hover:text-teal-600 hover:bg-teal-100"
+                              onClick={() => onView?.(r)} title="Lihat detail"
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              size="sm" variant="ghost"
+                              className="h-7 w-7 p-0 text-slate-400 hover:text-blue-600 hover:bg-blue-50"
+                              onClick={() => onEdit(r)} title="Edit"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              size="sm" variant="ghost"
+                              className="h-7 w-7 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50"
+                              onClick={() => onDelete(r.id)} title="Hapus"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* ── PAGINATION BAR ─────────────────────────────────────────── */}
+            <div className="flex items-center justify-between gap-4 px-4 py-3 border-t border-slate-100 bg-white flex-wrap">
+              {/* Info */}
+              <p className="text-xs text-slate-500 shrink-0">
+                Menampilkan <span className="font-semibold text-slate-700">{startItem}–{endItem}</span> dari{' '}
+                <span className="font-semibold text-slate-700">{rows.length}</span> record
+              </p>
+
+              {/* Navigation */}
+              <div className="flex items-center gap-1">
+                {/* First */}
+                <Button
+                  size="sm" variant="outline"
+                  className="h-7 w-7 p-0"
+                  onClick={() => setPage(1)}
+                  disabled={safePage === 1}
+                  title="Halaman pertama"
+                >
+                  <ChevronsLeft className="h-3.5 w-3.5" />
+                </Button>
+
+                {/* Prev */}
+                <Button
+                  size="sm" variant="outline"
+                  className="h-7 w-7 p-0"
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={safePage === 1}
+                  title="Halaman sebelumnya"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                </Button>
+
+                {/* Page numbers */}
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter(p => {
+                    // Tampilkan: halaman pertama, terakhir, current, dan ±1 dari current
+                    return p === 1 || p === totalPages || Math.abs(p - safePage) <= 1
+                  })
+                  .reduce<(number | 'ellipsis')[]>((acc, p, idx, arr) => {
+                    if (idx > 0 && (p as number) - (arr[idx - 1] as number) > 1) {
+                      acc.push('ellipsis')
+                    }
+                    acc.push(p)
+                    return acc
+                  }, [])
+                  .map((p, idx) =>
+                    p === 'ellipsis' ? (
+                      <span key={`e-${idx}`} className="px-1 text-xs text-slate-400">…</span>
+                    ) : (
+                      <Button
+                        key={p}
+                        size="sm" variant={safePage === p ? 'default' : 'outline'}
+                        className={cn(
+                          'h-7 min-w-[28px] px-2 text-xs',
+                          safePage === p && 'bg-teal-600 hover:bg-teal-700 border-teal-600'
                         )}
-                        onClick={e => e.stopPropagation()}
+                        onClick={() => setPage(p as number)}
                       >
-                        <div className="flex justify-center items-center gap-0.5">
-                          <Button
-                            size="sm" variant="ghost"
-                            className="h-7 w-7 p-0 text-slate-400 hover:text-teal-600 hover:bg-teal-100"
-                            onClick={() => onView?.(r)}
-                            title="Lihat detail"
-                          >
-                            <Eye className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            size="sm" variant="ghost"
-                            className="h-7 w-7 p-0 text-slate-400 hover:text-blue-600 hover:bg-blue-50"
-                            onClick={() => onEdit(r)}
-                            title="Edit"
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            size="sm" variant="ghost"
-                            className="h-7 w-7 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50"
-                            onClick={() => onDelete(r.id)}
-                            title="Hapus"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+                        {p}
+                      </Button>
+                    )
+                  )}
+
+                {/* Next */}
+                <Button
+                  size="sm" variant="outline"
+                  className="h-7 w-7 p-0"
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={safePage === totalPages}
+                  title="Halaman berikutnya"
+                >
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </Button>
+
+                {/* Last */}
+                <Button
+                  size="sm" variant="outline"
+                  className="h-7 w-7 p-0"
+                  onClick={() => setPage(totalPages)}
+                  disabled={safePage === totalPages}
+                  title="Halaman terakhir"
+                >
+                  <ChevronsRight className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
+          </>
         )}
       </CardContent>
     </Card>

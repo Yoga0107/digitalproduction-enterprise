@@ -6,9 +6,10 @@ import {
   LineChart, BarChart2, TrendingUp, Clock, Gauge,
   GaugeCircleIcon,
   FullscreenIcon,
+  TreePine,
 } from 'lucide-react';
 import {
-  OEE_MASTER_ROLES, OEE_INPUT_ROLES, OEE_VIEW_ROLES,
+  OEE_MASTER_ROLES, OEE_INPUT_ROLES, OEE_VIEW_ROLES, EQUIPMENT_ROLES,
 } from './oee-access';
 
 export interface SubMenuItem {
@@ -68,7 +69,7 @@ export const menuItems: MenuItem[] = [
       { title: 'Availability Rate',    href: '/oee/view/availability-rate',     roles: OEE_VIEW_ROLES,   group: 'Data View' },
       { title: 'Performance Rate',     href: '/oee/view/performance-rate',      roles: OEE_VIEW_ROLES,   group: 'Data View' },
       { title: 'Quality Rate',         href: '/oee/view/quality-rate',          roles: OEE_VIEW_ROLES,   group: 'Data View' },
-      { title: 'Summary OEE',          href: '/oee/view/summary-oee',               roles: OEE_VIEW_ROLES,   group: 'Data View' },
+      { title: 'Summary OEE',          href: '/oee/view/summary',               roles: OEE_VIEW_ROLES,   group: 'Data View' },
     ],
   },
 
@@ -129,6 +130,7 @@ export function getMenuItemsForUser(
     if (href.startsWith('/plants'))   return 'plants';
     if (href.startsWith('/settings')) return 'settings';
     if (href.startsWith('/dashboard'))return 'dashboard';
+    if (href.startsWith('/equipment'))  return 'equipment';
     return '';
   };
 

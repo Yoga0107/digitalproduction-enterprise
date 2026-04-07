@@ -40,3 +40,9 @@ export const OEE_ROUTE_ROLES: Record<string, UserRole[]> = {
 export function getRequiredRoles(path: string): UserRole[] {
   return OEE_ROUTE_ROLES[path] ?? OEE_VIEW_ROLES;
 }
+
+// ── Equipment Tree ────────────────────────────────────────────────────────────
+export const EQUIPMENT_ROLES: UserRole[] = ['admin', 'manager'];
+
+export const canAccessEquipment = (role?: UserRole | null) =>
+  !!role && EQUIPMENT_ROLES.includes(role);
