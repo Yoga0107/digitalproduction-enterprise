@@ -4,8 +4,8 @@
  * Gunakan getAvailabilityRate() dari services/oeeService.ts.
  */
 
-// Re-export type dari types/oee-types.ts agar import lama tidak error
-export type { AvailabilityRow } from "@/types/oee-types"
+// AvailabilityRow adalah alias dari OeeRow (unified type)
+export type { OeeRow as AvailabilityRow } from "@/types/oee-types"
 
 /** @deprecated Gunakan getAvailabilityRate() dari services/oeeService.ts */
 export const availabilityData: never[] = []
