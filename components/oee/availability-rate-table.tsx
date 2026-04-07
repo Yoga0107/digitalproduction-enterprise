@@ -20,12 +20,17 @@ function rateColor(rate: number | null): string {
   return "text-red-700 bg-red-50"
 }
 
-function fmtRate(rate: number | null): string {
-  if (rate === null) return "N/A"
-  return `${rate.toFixed(1)}%`
+function fmtRate(rate?: number | string | null): string {
+  if (rate == null) return "N/A"
+
+  const num = Number(rate)
+  if (isNaN(num)) return "N/A"
+
+  return `${num.toFixed(1)}%`
 }
 
-function fmtHour(h: number): string {
+function fmtHour(h?: number | null): string {
+  if (h === null || h === undefined) return "—"
   return `${h.toFixed(2)}h`
 }
 

@@ -9,3 +9,4 @@ export type { AvailabilityRow } from "@/types/oee-types"
 
 /** @deprecated Gunakan getAvailabilityRate() dari services/oeeService.ts */
 export const availabilityData: never[] = []
+
