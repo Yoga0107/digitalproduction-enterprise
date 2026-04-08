@@ -81,6 +81,10 @@ export const menuItems: MenuItem[] = [
     icon: Wrench,
     roles: EQUIPMENT_ROLES,
     description: 'Manajemen data & pohon peralatan',
+    children: [
+      { title: 'Trend Analysis', href: '/equipment/trend-analysis', roles: EQUIPMENT_ROLES },
+      { title: 'Equipment Tree', href: '/equipment',           roles: EQUIPMENT_ROLES },
+    ],
   },
   {
     title: 'Users',
