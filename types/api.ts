@@ -96,6 +96,19 @@ export interface ApiStandardThroughput {
   created_at: string; created_by_id: number | null;
 }
 
+export interface ApiStandardThroughputLog {
+  id: number;
+  standard_throughput_id: number;
+  change_number: number;
+  old_throughput: number | null;
+  new_throughput: number;
+  old_remarks: string | null;
+  new_remarks: string | null;
+  reason: string | null;
+  changed_at: string;
+  changed_by_id: number | null;
+}
+
 export interface ApiOutputType {
   id: number
   code: string

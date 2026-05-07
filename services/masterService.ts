@@ -6,6 +6,7 @@ import {
   ApiProductionOutput,
   ApiMergedLine,
   ApiOutputType,
+  ApiStandardThroughputLog,
 } from '@/types/api';
 
 // ─── Machine Loss Level 1 ──────────────────────────────────────────────────
@@ -107,10 +108,12 @@ export const getStandardThroughputs = () =>
   api.get<ApiStandardThroughput[]>('/api/v1/master/standard-throughputs');
 export const createStandardThroughput = (data: { line_id: number; feed_code_id: number; standard_throughput: number; remarks?: string }) =>
   api.post<ApiStandardThroughput>('/api/v1/master/standard-throughputs', data);
-export const updateStandardThroughput = (id: number, data: Partial<{ standard_throughput: number; remarks: string }>) =>
+export const updateStandardThroughput = (id: number, data: Partial<{ line_id: number; feed_code_id: number; standard_throughput: number; remarks: string; reason: string }>) =>
   api.put<ApiStandardThroughput>(`/api/v1/master/standard-throughputs/${id}`, data);
 export const deleteStandardThroughput = (id: number) =>
   api.delete(`/api/v1/master/standard-throughputs/${id}`);
+export const getStandardThroughputLogs = (id: number) =>
+  api.get<ApiStandardThroughputLog[]>(`/api/v1/master/standard-throughputs/${id}/logs`);
 
 // ─── Merged Lines ──────────────────────────────────────────────────────────
 export const getMergedLines = () =>

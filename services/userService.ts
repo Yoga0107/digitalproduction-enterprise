@@ -17,6 +17,9 @@ export interface ApiRole {
 export const listUsers = () =>
   api.get<ApiUser[]>('/api/v1/users/', { withPlant: false })
 
+export const listUsersBasic = () =>
+  api.get<{ id: number; full_name: string | null; username: string }[]>('/api/v1/users/basic', { withPlant: false })
+
 export const createUser = (data: {
   username: string
   email: string

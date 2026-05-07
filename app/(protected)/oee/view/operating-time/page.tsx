@@ -80,9 +80,10 @@ export default function OperatingTimePage() {
             <CardContent className="p-4 text-xs text-teal-800 space-y-1">
               <p className="font-semibold text-teal-900 mb-2">📐 Formula</p>
               <p><span className="font-medium">Loading Time</span> = Total Time − Σ Scheduled Downtime</p>
-              <p><span className="font-medium">Operating Losses</span> = semua Machine Loss selain Scheduled</p>
+              <p><span className="font-medium">Operating Losses</span> = Machine Loss selain Scheduled Downtime, Performance Loss, dan Defects &amp; Rework Loss</p>
               <p><span className="font-medium">Operating Time</span> = Loading Time − Σ Operating Losses</p>
-              <p><span className="font-medium">All Line</span> = Σ Operating Time semua line</p>
+              <p><span className="font-medium">All Line</span> = Σ Operating Time semua line (non-merged-member)</p>
+              <p className="text-teal-600 italic">Klik ikon ▶ di kiri baris untuk lihat detail breakdown operating losses per L1 → L2 → L3.</p>
             </CardContent>
           </Card>
         </div>

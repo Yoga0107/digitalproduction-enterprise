@@ -20,6 +20,9 @@ import { ConfirmDialog } from '@/components/confirm-dialog'
 import { ExportImportBar } from '@/components/oee/export-import-bar'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
+  Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
+} from '@/components/ui/tooltip'
+import {
   getProductionOutputs, createProductionOutput,
   updateProductionOutput, deleteProductionOutput,
   downloadProductionOutputsExcel, importProductionOutputsExcel,
@@ -34,7 +37,7 @@ import { toast } from 'sonner'
 import {
   Loader2, Plus, Pencil, Trash2, Activity, Eye,
   AlertCircle, TrendingUp, Package, RotateCcw,
-  Calendar, Factory, Clock, Tag, FileText, Layers,
+  Calendar, Factory, Clock, Tag, FileText, Layers, Info,
 } from 'lucide-react'
 import { ApiError } from '@/lib/api-client'
 import { cn } from '@/lib/utils'
@@ -384,6 +387,7 @@ export default function OutputPage() {
   })()
 
   return (
+    <TooltipProvider delayDuration={200}>
     <OeeGuard section="input">
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/20">
 
@@ -573,7 +577,22 @@ export default function OutputPage() {
                           <TableHead>Kode Pakan</TableHead>
                           {outputTypes.map(ot => (
                             <TableHead key={ot.code} className="text-right whitespace-nowrap">
-                              {ot.name} (kg)
+                              {ot.remarks ? (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="inline-flex items-center gap-1 cursor-help">
+                                      {ot.name} (kg)
+                                      <Info className="h-3 w-3 text-muted-foreground" />
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" className="max-w-[260px] text-xs leading-relaxed">
+                                    <p className="font-semibold mb-1">{ot.name}</p>
+                                    {ot.remarks}
+                                  </TooltipContent>
+                                </Tooltip>
+                              ) : (
+                                <span>{ot.name} (kg)</span>
+                              )}
                             </TableHead>
                           ))}
                           <TableHead className="text-right whitespace-nowrap">Actual (kg)</TableHead>
@@ -794,7 +813,22 @@ export default function OutputPage() {
                     <div key={ot.code} className="space-y-1.5">
                       <Label className="flex items-center gap-1.5 text-sm">
                         <span className={cn('h-2 w-2 rounded-full shrink-0', dotColor(idx))} />
-                        {ot.name}
+                        {ot.remarks ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="inline-flex items-center gap-1 cursor-help">
+                                {ot.name}
+                                <Info className="h-3 w-3 text-muted-foreground" />
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="right" className="max-w-[260px] text-xs leading-relaxed">
+                              <p className="font-semibold mb-1">{ot.name}</p>
+                              {ot.remarks}
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : (
+                          ot.name
+                        )}
                         {ot.is_good_product && (
                           <span className="text-xs text-amber-600 font-normal ml-1">(good product)</span>
                         )}
@@ -869,5 +903,6 @@ export default function OutputPage() {
         isLoading={isDeleting}
       />
     </OeeGuard>
+    </TooltipProvider>
   )
 }

@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import {
   Settings, Database, BarChart3, Timer, Factory,
   Package, Activity, Workflow, LineChart, BarChart2,
-  TrendingUp, Clock, Lock, ChevronRight, Layers,
+  TrendingUp, Clock, Clock4, Lock, ChevronRight, Layers,
 } from 'lucide-react';
 
 function SectionCard({
@@ -174,6 +174,7 @@ export default function OEEPage() {
           accentText="text-cyan-700"
           numberBg="bg-cyan-100"
           links={[
+            { href: '/oee/view/total-time',        label: 'Total Time',        icon: Clock4    },
             { href: '/oee/view/loading-time',      label: 'Loading Time',      icon: Clock     },
             { href: '/oee/view/operating-time',    label: 'Operating Time',    icon: Timer     },
             { href: '/oee/view/availability-rate', label: 'Availability Rate', icon: BarChart2 },

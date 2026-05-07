@@ -5,36 +5,59 @@
  * Satu endpoint /time-metrics melayani semuanya sekaligus.
  */
 
-// ─── Detail per line (semua field dari engine) ────────────────────────────────
-export interface OeeLineDetail {
-  name:          string
-  // Loading & Operating Time
-  total_h:       number
-  sched_loss_h:  number
-  op_loss_h:     number
-  loading_h:     number
-  operating_h:   number
-  // Rates
-  availability:  number | null   // %
-  performance:   number | null   // %
-  quality:       number | null   // %
-  // Production
-  actual_output: number
-  good_product:  number
-  ideal_output:  number
+export interface LossBreakdownItem {
+  l1:    string
+  l2:    string
+  l3:    string
+  hours: number
 }
 
-// ─── Aggregate all_line ───────────────────────────────────────────────────────
+export interface ShiftDetail {
+  shift_name:        string
+  total_h:           number
+  sched_loss_h:      number
+  loading_h:         number
+  op_loss_h:         number
+  operating_h:       number
+  sched_breakdown:   LossBreakdownItem[]
+  op_breakdown:      LossBreakdownItem[]
+}
+
+export interface OeeLineDetail {
+  name:              string
+  shifts:            Record<number, ShiftDetail>
+  total_h:           number
+  sched_loss_h:      number
+  op_loss_h:         number
+  loading_h:         number
+  operating_h:       number
+  availability:      number | null
+  performance:       number | null
+  quality:           number | null
+  oee:               number | null
+  actual_output:     number
+  good_product:      number
+  std_throughput:    number
+  actual_throughput: number
+  sched_breakdown:   LossBreakdownItem[]
+  op_breakdown:      LossBreakdownItem[]
+}
+
 export interface OeeAllLine {
-  total_h:       number
-  loading_h:     number
-  operating_h:   number
-  availability:  number | null
-  actual_output: number
-  good_product:  number
-  ideal_output:  number
-  performance:   number | null
-  quality:       number | null
+  shifts:            Record<number, ShiftDetail>
+  total_h:           number
+  sched_loss_h:      number
+  op_loss_h:         number
+  loading_h:         number
+  operating_h:       number
+  availability:      number | null
+  actual_output:     number
+  good_product:      number
+  performance:       number | null
+  quality:           number | null
+  oee:               number | null
+  sched_breakdown:   LossBreakdownItem[]
+  op_breakdown:      LossBreakdownItem[]
 }
 
 // ─── Satu baris (per tanggal / per bulan) ────────────────────────────────────

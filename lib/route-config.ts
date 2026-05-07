@@ -66,11 +66,12 @@ export const menuItems: MenuItem[] = [
 
       // View Data — semua role
       { title: 'Loading Time',         href: '/oee/view/loading-time',          roles: OEE_VIEW_ROLES,   group: 'Data View' },
+      { title: 'Total Time',           href: '/oee/view/total-time',            roles: OEE_VIEW_ROLES,   group: 'Data View' },
       { title: 'Operating Time',       href: '/oee/view/operating-time',        roles: OEE_VIEW_ROLES,   group: 'Data View' },
       { title: 'Availability Rate',    href: '/oee/view/availability-rate',     roles: OEE_VIEW_ROLES,   group: 'Data View' },
       { title: 'Performance Rate',     href: '/oee/view/performance-rate',      roles: OEE_VIEW_ROLES,   group: 'Data View' },
       { title: 'Quality Rate',         href: '/oee/view/quality-rate',          roles: OEE_VIEW_ROLES,   group: 'Data View' },
-      { title: 'Summary OEE',          href: '/oee/view/summary',               roles: OEE_VIEW_ROLES,   group: 'Data View' },
+      { title: 'Summary OEE',          href: '/oee/view/summary-oee',           roles: OEE_VIEW_ROLES,   group: 'Data View' },
     ],
   },
 
