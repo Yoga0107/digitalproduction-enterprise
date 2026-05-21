@@ -20,6 +20,7 @@ import {
   MachineLossEntryDialog,
   MachineLossFormState,
   EMPTY_LOSS_FORM,
+  isL1NoFeedCodeRequired,
 } from '@/components/oee/machine-loss-entry-dialog'
 
 import {
@@ -376,6 +377,14 @@ export default function MachineLossInputPage() {
     if (!form.line_id)    { setFormError('Line wajib dipilih.'); return }
     if (!form.shift_id)   { setFormError('Shift wajib dipilih.'); return }
     if (!form.loss_l1_id) { setFormError('Kategori kerugian (L1) wajib dipilih.'); return }
+
+    // Kode pakan wajib — kecuali L1 yang dipilih termasuk kategori no-feed-code
+    const selL1Name = allLvl1.find(l => String(l.machine_losses_lvl_1_id) === form.loss_l1_id)?.name
+    if (!form.feed_code_id && !isL1NoFeedCodeRequired(selL1Name)) {
+      setFormError('Kode pakan wajib dipilih untuk kategori loss ini.')
+      return
+    }
+
     const dur = Number(form.duration_hours)
     if (!form.duration_hours || dur <= 0) { setFormError('Durasi harus lebih dari 0.'); return }
 

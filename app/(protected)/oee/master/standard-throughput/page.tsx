@@ -24,6 +24,12 @@ import { ApiError } from "@/lib/api-client"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 import { ApiStandardThroughputLog } from "@/types/api"
 
+// ─── IMPORT / EXPORT ─────────────────────────────────────────────────────────
+// Untuk menonaktifkan fitur ini, comment 2 baris berikut:
+import { ImportExportButtons } from "@/components/oee/ImportExportButtons"
+const ENABLE_IMPORT_EXPORT = true
+// ─────────────────────────────────────────────────────────────────────────────
+
 type Row = { id: number; lineId: number; lineName: string; feedCodeId: number; feedCode: string; throughput: number; remarks: string }
 type Opt  = { id: number; label: string }
 const EMPTY = { lineId: "", feedCodeId: "", throughput: "", remarks: "", reason: "" }
@@ -100,6 +106,20 @@ export default function StandardThroughputPage() {
     if (!form.lineId || !form.feedCodeId || !form.throughput) { setFormError("Line, Kode Pakan, dan Throughput wajib diisi."); return }
     if (Number(form.throughput) <= 0) { setFormError("Throughput harus lebih dari 0."); return }
     if (editing && !form.reason.trim()) { setFormError("Alasan perubahan wajib diisi."); return }
+
+    // Cek duplikat kombinasi line + kode pakan (kecuali untuk baris yang sedang diedit)
+    const isDuplicate = rows.some(r =>
+      r.lineId === Number(form.lineId) &&
+      r.feedCodeId === Number(form.feedCodeId) &&
+      r.id !== editing?.id
+    )
+    if (isDuplicate) {
+      const lineName = lines.find(l => l.id === Number(form.lineId))?.label ?? ''
+      const feedCode = feeds.find(f => f.id === Number(form.feedCodeId))?.label ?? ''
+      setFormError(`Kombinasi "${lineName} – ${feedCode}" sudah terdaftar.`)
+      return
+    }
+
     setIsSaving(true)
     try {
       if (editing) {
@@ -144,8 +164,71 @@ export default function StandardThroughputPage() {
     finally { setIsDeleting(false); setDeleteId(null) }
   }
 
-  const lineChanged     = editing ? Number(form.lineId) !== editing.lineId : false
-  const feedChanged     = editing ? Number(form.feedCodeId) !== editing.feedCodeId : false
+  // ── Import handler ───────────────────────────────────────────────────────
+  async function handleImport(csvRows: Record<string, string>[]) {
+    // Deduplikasi dalam CSV sendiri: jika ada kombinasi Line+KodePakan yang sama,
+    // pakai baris terakhir (overwrite). Key = "lineName||feedCode"
+    const deduped = new Map<string, Record<string, string>>()
+    for (const row of csvRows) {
+      const lineName = row['Line']?.trim() ?? ''
+      const feedCode = row['Kode Pakan']?.trim().toUpperCase() ?? ''
+      if (!lineName || !feedCode) continue
+      deduped.set(`${lineName}||${feedCode}`, row)
+    }
+
+    let created = 0
+    let skippedDb = 0
+
+    for (const row of deduped.values()) {
+      const lineName   = row['Line']?.trim()
+      const feedCode   = row['Kode Pakan']?.trim().toUpperCase()
+      const throughput = Number(row['Throughput (kg/jam)']?.trim())
+      const remarks    = row['Remarks']?.trim() || ''
+
+      if (!lineName || !feedCode || !throughput || throughput <= 0) continue
+
+      // Cari ID Line
+      const lineObj = lines.find(l => l.label.toLowerCase() === lineName.toLowerCase())
+      if (!lineObj) {
+        toast.warning(`Line "${lineName}" tidak ditemukan, baris dilewati`)
+        continue
+      }
+
+      // Cari ID Feed Code
+      const feedObj = feeds.find(f => f.label.toUpperCase() === feedCode)
+      if (!feedObj) {
+        toast.warning(`Kode pakan "${feedCode}" tidak ditemukan, baris dilewati`)
+        continue
+      }
+
+      // Cek duplikat terhadap data yang sudah ada di DB
+      const existsInDb = rows.some(r => r.lineId === lineObj.id && r.feedCodeId === feedObj.id)
+      if (existsInDb) {
+        skippedDb++
+        continue
+      }
+
+      await createStandardThroughput({
+        line_id: lineObj.id,
+        feed_code_id: feedObj.id,
+        standard_throughput: throughput,
+        remarks,
+      })
+      created++
+    }
+
+    if (created === 0 && skippedDb > 0)
+      throw new Error(`Semua kombinasi sudah ada di database (${skippedDb} baris dilewati)`)
+    if (created === 0)
+      throw new Error('Tidak ada baris valid yang dapat diimpor')
+    if (skippedDb > 0)
+      toast.info(`${skippedDb} kombinasi sudah ada di database, dilewati`)
+
+    await load()
+  }
+
+  const lineChanged       = editing ? Number(form.lineId) !== editing.lineId : false
+  const feedChanged       = editing ? Number(form.feedCodeId) !== editing.feedCodeId : false
   const throughputChanged = editing ? Number(form.throughput) !== editing.throughput : false
   const remarksChanged    = editing ? form.remarks !== editing.remarks : false
   const delta             = editing ? Number(form.throughput) - editing.throughput : 0
@@ -184,9 +267,32 @@ export default function StandardThroughputPage() {
               <h1 className="text-3xl font-bold tracking-tight text-emerald-900">Standard Throughput</h1>
               <p className="text-emerald-600 text-sm mt-1">Throughput standar per kombinasi Line dan Kode Pakan. Satu Line boleh memiliki banyak Kode Pakan berbeda.</p>
             </div>
-            <Button onClick={openAdd} disabled={lines.length === 0 || feeds.length === 0}>
-              <Plus className="h-4 w-4 mr-2" /> Tambah
-            </Button>
+            <div className="flex items-center gap-2">
+              {/* ── IMPORT / EXPORT ── comment blok ini untuk menonaktifkan */}
+              {ENABLE_IMPORT_EXPORT && (
+                <ImportExportButtons
+                  entityName="standard-throughput"
+                  columns={[
+                    { key: 'lineName',   label: 'Line' },
+                    { key: 'feedCode',   label: 'Kode Pakan' },
+                    { key: 'throughput', label: 'Throughput (kg/jam)' },
+                    { key: 'remarks',    label: 'Remarks' },
+                  ]}
+                  dataToExport={() => rows.map(r => ({
+                    'Line':                  r.lineName,
+                    'Kode Pakan':            r.feedCode,
+                    'Throughput (kg/jam)':   r.throughput,
+                    'Remarks':               r.remarks,
+                  }))}
+                  onImport={handleImport}
+                  disabled={isLoading || lines.length === 0 || feeds.length === 0}
+                />
+              )}
+              {/* ── /IMPORT / EXPORT ── */}
+              <Button onClick={openAdd} disabled={lines.length === 0 || feeds.length === 0}>
+                <Plus className="h-4 w-4 mr-2" /> Tambah
+              </Button>
+            </div>
           </div>
 
           {!isLoading && (lines.length === 0 || feeds.length === 0) && (

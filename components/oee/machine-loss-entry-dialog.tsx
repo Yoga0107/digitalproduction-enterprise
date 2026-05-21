@@ -18,6 +18,25 @@ import { ApiLine, ApiShift, ApiMachineLossLvl1, ApiMachineLossLvl2, ApiMachineLo
 import { cn } from '@/lib/utils'
 import { calcDurationHours, fmtMinutes } from '@/lib/machine-loss-utils'
 
+// ─────────────────────────────────────────────────────────────────────────────
+// KONFIGURASI: Nama L1 yang TIDAK memerlukan Kode Pakan.
+// Tambahkan atau hapus nama sesuai kebutuhan (case-insensitive).
+// ─────────────────────────────────────────────────────────────────────────────
+export const L1_NO_FEED_CODE_REQUIRED: string[] = [
+  'no order',
+  'no feed code',
+  'planned downtime',
+  'planned maintenance',
+]
+
+// Helper: cek apakah L1 yang dipilih tidak memerlukan kode pakan
+export function isL1NoFeedCodeRequired(l1Name: string | undefined): boolean {
+  if (!l1Name) return false
+  return L1_NO_FEED_CODE_REQUIRED.some(
+    ex => ex.toLowerCase() === l1Name.toLowerCase()
+  )
+}
+
 export type MachineLossFormState = {
   date:           string
   line_id:        string
@@ -192,9 +211,15 @@ export function MachineLossEntryDialog({
 
   const step1Done = !!(form.date && form.line_id && form.shift_id)
   const step3Done = !!form.loss_l1_id
-  const step4Done = !!(form.duration_hours && Number(form.duration_hours) > 0)
 
   const selL1 = allLvl1.find(l => String(l.machine_losses_lvl_1_id) === form.loss_l1_id)
+
+  // Apakah L1 yang dipilih termasuk yang tidak wajib kode pakan?
+  const l1NoFeedRequired = isL1NoFeedCodeRequired(selL1?.name)
+  const feedCodeOptional = l1NoFeedRequired    // alias lebih ekspresif
+  const step2Done = step1Done && (!!form.feed_code_id || feedCodeOptional)
+  const step4Done = !!(form.duration_hours && Number(form.duration_hours) > 0)
+
   const selL2 = allLvl2.find(l => String(l.machine_losses_lvl_2_id) === form.loss_l2_id)
   const selL3 = allLvl3.find(l => String(l.machine_losses_lvl_3_id) === form.loss_l3_id)
 
@@ -277,12 +302,37 @@ export function MachineLossEntryDialog({
             </div>
           </Section>
 
-          {/* STEP 2 */}
-          <Section step={2} label="Kode Pakan" icon={Tag} locked={!step1Done} done={step1Done && !!form.feed_code_id}>
-            <Select value={form.feed_code_id || 'none'} onValueChange={v => set({ feed_code_id: v === 'none' ? '' : v })}>
-              <SelectTrigger><SelectValue placeholder="Pilih kode pakan…" /></SelectTrigger>
+          {/* STEP 2 — Kode Pakan */}
+          <Section
+            step={2}
+            label={feedCodeOptional ? 'Kode Pakan (tidak diperlukan)' : 'Kode Pakan'}
+            icon={Tag}
+            locked={!step1Done}
+            done={step2Done}
+          >
+            {/* Hint jika L1 yang dipilih tidak memerlukan kode pakan */}
+            {feedCodeOptional && (
+              <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800">
+                <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0 text-amber-600" />
+                <span>
+                  Loss category <span className="font-semibold">&quot;{selL1?.name}&quot;</span> tidak memerlukan
+                  kode pakan. Field ini opsional — boleh dikosongkan.
+                </span>
+              </div>
+            )}
+            <Select
+              value={form.feed_code_id || 'none'}
+              onValueChange={v => set({ feed_code_id: v === 'none' ? '' : v })}
+            >
+              <SelectTrigger className={feedCodeOptional && !form.feed_code_id ? 'border-dashed text-muted-foreground' : ''}>
+                <SelectValue placeholder={feedCodeOptional ? 'Opsional — boleh dikosongkan' : 'Pilih kode pakan…'} />
+              </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none"><span className="text-muted-foreground italic">— Tidak ada —</span></SelectItem>
+                <SelectItem value="none">
+                  <span className="text-muted-foreground italic">
+                    {feedCodeOptional ? '— Tidak ada (opsional) —' : '— Tidak ada —'}
+                  </span>
+                </SelectItem>
                 {feedCodes.map(fc => (
                   <SelectItem key={fc.id} value={String(fc.id)}>
                     <span className="font-mono font-medium">{fc.code}</span>

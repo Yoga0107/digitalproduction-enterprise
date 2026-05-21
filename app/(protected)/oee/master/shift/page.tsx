@@ -16,6 +16,12 @@ import { toast } from 'sonner'
 import { Loader2, Plus, Pencil, Trash2, AlertCircle, Clock, Timer } from 'lucide-react'
 import { ApiError } from '@/lib/api-client'
 
+// ─── IMPORT / EXPORT ─────────────────────────────────────────────────────────
+// Untuk menonaktifkan fitur ini, comment 2 baris berikut:
+import { ImportExportButtons } from '@/components/oee/ImportExportButtons'
+const ENABLE_IMPORT_EXPORT = true
+// ─────────────────────────────────────────────────────────────────────────────
+
 const SHIFT_NAMES = [
   'Shift 1', 'Shift 2', 'Shift 3'
 ]
@@ -117,6 +123,27 @@ export default function MasterShiftPage() {
     finally { setIsDeleting(false); setDeleteId(null) }
   }
 
+  // ── Import handler ───────────────────────────────────────────────────────
+  async function handleImport(csvRows: Record<string, string>[]) {
+    let created = 0
+    for (const row of csvRows) {
+      const name    = row['Nama Shift']?.trim()
+      const from    = row['Mulai']?.trim()
+      const to      = row['Selesai']?.trim()
+      const remarks = row['Remarks']?.trim() ?? ''
+      if (!name || !from || !to) continue
+      await createShift({
+        name,
+        time_from: from.length === 5 ? from + ':00' : from,
+        time_to:   to.length === 5 ? to + ':00' : to,
+        remarks,
+      })
+      created++
+    }
+    if (created === 0) throw new Error('Tidak ada baris valid yang dapat diimpor')
+    await load()
+  }
+
   const allRegistered = availableNames.length === 0
 
   return (
@@ -146,10 +173,33 @@ export default function MasterShiftPage() {
               Shift Management
             </p>
           </div>
-          <Button onClick={openAdd} disabled={allRegistered}>
-            <Plus className="h-4 w-4 mr-2" />
-            {allRegistered ? 'Semua shift terdaftar' : 'Tambah Shift'}
-          </Button>
+          <div className="flex items-center gap-2">
+            {/* ── IMPORT / EXPORT ── comment blok ini untuk menonaktifkan */}
+            {ENABLE_IMPORT_EXPORT && (
+              <ImportExportButtons
+                entityName="shift"
+                columns={[
+                  { key: 'name',    label: 'Nama Shift' },
+                  { key: 'from',    label: 'Mulai' },
+                  { key: 'to',      label: 'Selesai' },
+                  { key: 'remarks', label: 'Remarks' },
+                ]}
+                dataToExport={() => rows.map(r => ({
+                  'Nama Shift': r.name,
+                  'Mulai':      r.from,
+                  'Selesai':    r.to,
+                  'Remarks':    r.remarks,
+                }))}
+                onImport={handleImport}
+                disabled={isLoading}
+              />
+            )}
+            {/* ── /IMPORT / EXPORT ── */}
+            <Button onClick={openAdd} disabled={allRegistered}>
+              <Plus className="h-4 w-4 mr-2" />
+              {allRegistered ? 'Semua shift terdaftar' : 'Tambah Shift'}
+            </Button>
+          </div>
         </div>
 
         {/* Progress indicator */}
@@ -190,11 +240,10 @@ export default function MasterShiftPage() {
                   {rows.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={5} className="text-center py-12 text-emerald-600">
-                        Belum ada shift. Klik "Tambah Shift" untuk menambahkan.
+                        Belum ada shift. Klik &quot;Tambah Shift&quot; untuk menambahkan.
                       </TableCell>
                     </TableRow>
                   ) : rows
-                    // Urutkan berdasarkan nomor shift (Shift 1, Shift 2, ...)
                     .sort((a, b) => {
                       const na = SHIFT_NAMES.indexOf(a.name)
                       const nb = SHIFT_NAMES.indexOf(b.name)
@@ -261,7 +310,6 @@ export default function MasterShiftPage() {
                   </SelectTrigger>
                   <SelectContent>
                     {editing
-                   
                       ? SHIFT_NAMES.map(name => {
                           const takenByOther = rows.some(r => r.name === name && r.id !== editing.id)
                           return (
@@ -275,7 +323,6 @@ export default function MasterShiftPage() {
                             </SelectItem>
                           )
                         })
-                      // Saat tambah: hanya tampilkan yang belum terdaftar
                       : availableNames.map(name => (
                           <SelectItem key={name} value={name}>
                             {name}
@@ -291,7 +338,7 @@ export default function MasterShiftPage() {
                 )}
               </div>
 
-              {/* Waktu — diisi manual */}
+              {/* Waktu */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>Mulai <span className="text-destructive">*</span></Label>

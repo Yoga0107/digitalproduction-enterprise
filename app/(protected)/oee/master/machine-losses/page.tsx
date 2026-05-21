@@ -29,6 +29,12 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
+// ─── IMPORT / EXPORT ─────────────────────────────────────────────────────────
+// Untuk menonaktifkan fitur ini, comment 2 baris berikut:
+import { ImportExportButtons } from '@/components/oee/ImportExportButtons'
+const ENABLE_IMPORT_EXPORT = true
+// ─────────────────────────────────────────────────────────────────────────────
+
 // ─── Inline editable row ──────────────────────────────────────────────────────
 function LevelRow({
   id, name, badgeColor, onEdit, onDelete,
@@ -158,9 +164,6 @@ function AddRow({ onAdd, placeholder }: { onAdd: (name: string) => Promise<void>
 }
 
 // ─── Katalog Dialog ────────────────────────────────────────────────────────────
-// CATATAN: Lvl2 & Lvl3 adalah tabel FLAT di backend.
-// Semua item dari semua level selalu ditampilkan — tidak difilter per parent.
-// Hierarki hanya ada di tabel master_machine_losses (kombinasi L1+L2+L3).
 function KatalogDialog({
   open, onClose, onSave,
   lvl1List, lvl2List, lvl3List,
@@ -219,7 +222,7 @@ function KatalogDialog({
             </Select>
           </div>
 
-          {/* L2 — opsional, tampil semua (flat table) */}
+          {/* L2 */}
           <div className="space-y-1.5 pl-3 border-l-2 border-red-100">
             <label className="text-xs font-semibold flex items-center gap-1.5">
               <span className="px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 text-[10px] font-bold">L2</span>
@@ -240,7 +243,7 @@ function KatalogDialog({
             </Select>
           </div>
 
-          {/* L3 — opsional, tampil semua (flat table) */}
+          {/* L3 */}
           <div className="space-y-1.5 pl-6 border-l-2 border-violet-100">
             <label className="text-xs font-semibold flex items-center gap-1.5">
               <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[10px] font-bold">L3</span>
@@ -292,7 +295,6 @@ export default function MachineLossPage() {
   const [katalog, setKatalog]   = useState<ApiMasterMachineLoss[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
-  // Filter katalog berdasarkan L1/L2 yang dipilih
   const [filterL1, setFilterL1] = useState<number | null>(null)
   const [filterL2, setFilterL2] = useState<number | null>(null)
 
@@ -317,31 +319,31 @@ export default function MachineLossPage() {
   // ── L1 handlers ─────────────────────────────────────────────────────────
   async function addL1(name: string) {
     try { await createMachineLossLvl1({ name }); await load(); toast.success('Level 1 ditambahkan') }
-    catch (e: any) { toast.error(e?.detail ?? 'Gagal menambahkan') }
+    catch (e: unknown) { toast.error((e as { detail?: string })?.detail ?? 'Gagal menambahkan') }
   }
   async function editL1(id: number, name: string) {
     try { await updateMachineLossLvl1(id, { name }); await load(); toast.success('Berhasil diperbarui') }
-    catch (e: any) { toast.error(e?.detail ?? 'Gagal memperbarui') }
+    catch (e: unknown) { toast.error((e as { detail?: string })?.detail ?? 'Gagal memperbarui') }
   }
 
-  // ── L2 handlers (flat — tidak butuh lvl1_id) ─────────────────────────────
+  // ── L2 handlers ─────────────────────────────────────────────────────────
   async function addL2(name: string) {
     try { await createMachineLossLvl2({ name }); await load(); toast.success('Level 2 ditambahkan') }
-    catch (e: any) { toast.error(e?.detail ?? 'Gagal menambahkan') }
+    catch (e: unknown) { toast.error((e as { detail?: string })?.detail ?? 'Gagal menambahkan') }
   }
   async function editL2(id: number, name: string) {
     try { await updateMachineLossLvl2(id, { name }); await load(); toast.success('Berhasil diperbarui') }
-    catch (e: any) { toast.error(e?.detail ?? 'Gagal memperbarui') }
+    catch (e: unknown) { toast.error((e as { detail?: string })?.detail ?? 'Gagal memperbarui') }
   }
 
-  // ── L3 handlers (flat — tidak butuh lvl2_id) ─────────────────────────────
+  // ── L3 handlers ─────────────────────────────────────────────────────────
   async function addL3(name: string) {
     try { await createMachineLossLvl3({ name }); await load(); toast.success('Level 3 ditambahkan') }
-    catch (e: any) { toast.error(e?.detail ?? 'Gagal menambahkan') }
+    catch (e: unknown) { toast.error((e as { detail?: string })?.detail ?? 'Gagal menambahkan') }
   }
   async function editL3(id: number, name: string) {
     try { await updateMachineLossLvl3(id, { name }); await load(); toast.success('Berhasil diperbarui') }
-    catch (e: any) { toast.error(e?.detail ?? 'Gagal memperbarui') }
+    catch (e: unknown) { toast.error((e as { detail?: string })?.detail ?? 'Gagal memperbarui') }
   }
 
   // ── Delete handler ───────────────────────────────────────────────────────
@@ -354,7 +356,7 @@ export default function MachineLossPage() {
       else if (deleteTarget.type === 'lvl3') await deleteMachineLossLvl3(deleteTarget.id)
       else await deleteMasterMachineLoss(deleteTarget.id)
       toast.success('Berhasil dihapus'); await load()
-    } catch (e: any) { toast.error(e?.detail ?? 'Gagal menghapus') }
+    } catch (e: unknown) { toast.error((e as { detail?: string })?.detail ?? 'Gagal menghapus') }
     finally { setIsDeleting(false); setDeleteTarget(null) }
   }
 
@@ -375,25 +377,98 @@ export default function MachineLossPage() {
       })
       toast.success('Kombinasi berhasil ditambahkan')
       setKatalogOpen(false); await load()
-    } catch (e: any) { toast.error(e?.detail ?? 'Gagal menyimpan') }
+    } catch (e: unknown) { toast.error((e as { detail?: string })?.detail ?? 'Gagal menyimpan') }
     finally { setIsSavingKatalog(false) }
   }
 
-  // ── Derived — filter katalog berdasarkan pilihan L1/L2 ──────────────────
+  // ── Import handler: katalog (L1 name, L2 name, L3 name) ─────────────────
+  async function handleImportKatalog(csvRows: Record<string, string>[]) {
+    // Cache lokal agar tidak re-fetch tiap baris — diupdate jika ada yang di-create
+    const localL1 = [...lvl1List]
+    const localL2 = [...lvl2List]
+    const localL3 = [...lvl3List]
+    const localKatalog = [...katalog]
+
+    let created = 0
+    let skippedDup = 0
+
+    for (const row of csvRows) {
+      const l1Name  = row['Loss Category (L1)']?.trim()
+      const l2Name  = row['Sub Category (L2)']?.trim() || null
+      const l3Name  = row['Detail Loss (L3)']?.trim() || null
+      const remarks = row['Remarks']?.trim() || undefined
+
+      if (!l1Name) continue
+
+      // ── L1: cari atau buat ──────────────────────────────────────────────
+      let l1 = localL1.find(l => l.name.toLowerCase() === l1Name.toLowerCase())
+      if (!l1) {
+        const created1 = await createMachineLossLvl1({ name: l1Name })
+        localL1.push(created1)
+        l1 = created1
+      }
+
+      // ── L2: cari atau buat ──────────────────────────────────────────────
+      let l2: ApiMachineLossLvl2 | null = null
+      if (l2Name) {
+        l2 = localL2.find(l => l.name.toLowerCase() === l2Name.toLowerCase()) ?? null
+        if (!l2) {
+          const created2 = await createMachineLossLvl2({ name: l2Name })
+          localL2.push(created2)
+          l2 = created2
+        }
+      }
+
+      // ── L3: cari atau buat ──────────────────────────────────────────────
+      let l3: ApiMachineLossLvl3 | null = null
+      if (l3Name) {
+        l3 = localL3.find(l => l.name.toLowerCase() === l3Name.toLowerCase()) ?? null
+        if (!l3) {
+          const created3 = await createMachineLossLvl3({ name: l3Name })
+          localL3.push(created3)
+          l3 = created3
+        }
+      }
+
+      // ── Cek duplikat kombinasi di katalog ───────────────────────────────
+      const l1Id = l1.machine_losses_lvl_1_id
+      const l2Id = l2?.machine_losses_lvl_2_id ?? null
+      const l3Id = l3?.machine_losses_lvl_3_id ?? null
+
+      const isDup = localKatalog.some(k =>
+        k.machine_losses_lvl_1_id === l1Id &&
+        k.machine_losses_lvl_2_id === l2Id &&
+        k.machine_losses_lvl_3_id === l3Id
+      )
+      if (isDup) { skippedDup++; continue }
+
+      // ── Buat kombinasi ──────────────────────────────────────────────────
+      const newKombinasi = await createMasterMachineLoss({
+        machine_losses_lvl_1_id: l1Id,
+        machine_losses_lvl_2_id: l2Id,
+        machine_losses_lvl_3_id: l3Id,
+        remarks,
+      })
+      localKatalog.push(newKombinasi)
+      created++
+    }
+
+    if (created === 0 && skippedDup > 0)
+      throw new Error(`Semua kombinasi sudah terdaftar (${skippedDup} baris dilewati)`)
+    if (created === 0)
+      throw new Error('Tidak ada baris valid yang dapat diimpor')
+    if (skippedDup > 0)
+      toast.info(`${skippedDup} kombinasi sudah ada, dilewati`)
+
+    await load()
+  }
+
+  // ── Derived ──────────────────────────────────────────────────────────────
   const filtKat = katalog.filter(k =>
     (!filterL1 || k.machine_losses_lvl_1_id === filterL1) &&
     (!filterL2 || k.machine_losses_lvl_2_id === filterL2)
   )
-  const getL1Name = (id: number | null) =>
-  lvl1List.find(l => l.machine_losses_lvl_1_id === id)?.name
 
-const getL2Name = (id: number | null) =>
-  lvl2List.find(l => l.machine_losses_lvl_2_id === id)?.name
-
-const getL3Name = (id: number | null) =>
-  lvl3List.find(l => l.machine_losses_lvl_3_id === id)?.name
-
-  // Hitung berapa kali setiap L1/L2/L3 dipakai di katalog (untuk badge)
   const l1UsageCount = (l1id: number) =>
     katalog.filter(k => k.machine_losses_lvl_1_id === l1id).length
   const l2UsageCount = (l2id: number) =>
@@ -426,7 +501,7 @@ const getL3Name = (id: number | null) =>
             <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-teal-600" /></div>
           ) : (
             <>
-              {/* Info banner: struktur flat */}
+              {/* Info banner */}
               <div className="rounded-lg border border-blue-200 bg-blue-50/60 px-4 py-3 text-xs text-blue-700 flex items-start gap-2">
                 <span className="font-bold mt-0.5">ℹ</span>
                 <span>
@@ -471,7 +546,7 @@ const getL3Name = (id: number | null) =>
                   </CardContent>
                 </Card>
 
-                {/* L2 — flat, tidak tergantung L1 */}
+                {/* L2 */}
                 <Card className="border-violet-100 shadow-sm">
                   <CardHeader className="pb-3 border-b border-violet-50 bg-violet-50/40 rounded-t-xl">
                     <CardTitle className="text-sm flex items-center gap-2">
@@ -501,7 +576,7 @@ const getL3Name = (id: number | null) =>
                   </CardContent>
                 </Card>
 
-                {/* L3 — flat, tidak tergantung L2 */}
+                {/* L3 */}
                 <Card className="border-emerald-100 shadow-sm">
                   <CardHeader className="pb-3 border-b border-emerald-50 bg-emerald-50/40 rounded-t-xl">
                     <CardTitle className="text-sm flex items-center gap-2">
@@ -549,6 +624,27 @@ const getL3Name = (id: number | null) =>
                           <X className="h-3 w-3 mr-1" /> Reset Filter
                         </Button>
                       )}
+                      {/* ── IMPORT / EXPORT ── comment blok ini untuk menonaktifkan */}
+                      {ENABLE_IMPORT_EXPORT && (
+                        <ImportExportButtons
+                          entityName="machine-losses"
+                          columns={[
+                            { key: 'lvl1_name', label: 'Loss Category (L1)' },
+                            { key: 'lvl2_name', label: 'Sub Category (L2)' },
+                            { key: 'lvl3_name', label: 'Detail Loss (L3)' },
+                            { key: 'remarks',   label: 'Remarks' },
+                          ]}
+                          dataToExport={() => katalog.map(k => ({
+                            'Loss Category (L1)': k.lvl1_name ?? '',
+                            'Sub Category (L2)':  k.lvl2_name ?? '',
+                            'Detail Loss (L3)':   k.lvl3_name ?? '',
+                            'Remarks':            k.remarks ?? '',
+                          }))}
+                          onImport={handleImportKatalog}
+                          disabled={isLoading}
+                        />
+                      )}
+                      {/* ── /IMPORT / EXPORT ── */}
                       <Button size="sm" className="bg-teal-600 hover:bg-teal-700 h-7 text-xs gap-1"
                         onClick={() => setKatalogOpen(true)}>
                         <Plus className="h-3.5 w-3.5" /> Tambah Kombinasi

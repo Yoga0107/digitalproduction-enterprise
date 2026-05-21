@@ -1,7 +1,9 @@
 import { AuthProvider } from '@/lib/auth-context';
+
 import './globals.css';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
+import { FloatingChatbot } from '@/components/chat';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -23,7 +25,6 @@ export const metadata: Metadata = {
       },
     ],
   },
-
 };
 
 export default function RootLayout({
@@ -35,6 +36,7 @@ export default function RootLayout({
     <html lang="id">
       <body className={inter.className}>
         <AuthProvider>{children}</AuthProvider>
+        <FloatingChatbot />
       </body>
     </html>
   );

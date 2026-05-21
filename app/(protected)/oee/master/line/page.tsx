@@ -23,6 +23,12 @@ import {
 } from 'lucide-react'
 import { ApiError } from '@/lib/api-client'
 
+// ─── IMPORT / EXPORT ─────────────────────────────────────────────────────────
+// Untuk menonaktifkan fitur ini, comment 2 baris berikut:
+import { ImportExportButtons } from '@/components/oee/ImportExportButtons'
+const ENABLE_IMPORT_EXPORT = true
+// ─────────────────────────────────────────────────────────────────────────────
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 type LineRow = {
   id: number
@@ -196,6 +202,21 @@ export default function MasterLinePage() {
     finally { setIsDeletingMerged(false); setDeleteMergedId(null) }
   }
 
+  // ── Import handler (hanya untuk Master Line, bukan Merged) ───────────────
+  async function handleImport(csvRows: Record<string, string>[]) {
+    let created = 0
+    for (const row of csvRows) {
+      const name    = row['Nama Line']?.trim()
+      const code    = row['Kode Line']?.trim() || undefined
+      const remarks = row['Remarks']?.trim() || undefined
+      if (!name) continue
+      await createLine({ name, code, remarks })
+      created++
+    }
+    if (created === 0) throw new Error('Tidak ada baris valid yang dapat diimpor')
+    await load()
+  }
+
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <OeeGuard section="master">
@@ -230,9 +251,30 @@ export default function MasterLinePage() {
                   <p className="text-emerald-600 text-sm">Daftar line produksi yang tersedia di plant ini.</p>
                 </div>
               </div>
-              <Button onClick={openAdd}>
-                <Plus className="h-4 w-4 mr-2" /> Tambah Line
-              </Button>
+              <div className="flex items-center gap-2">
+                {/* ── IMPORT / EXPORT ── comment blok ini untuk menonaktifkan */}
+                {ENABLE_IMPORT_EXPORT && (
+                  <ImportExportButtons
+                    entityName="line"
+                    columns={[
+                      { key: 'name',    label: 'Nama Line' },
+                      { key: 'code',    label: 'Kode Line' },
+                      { key: 'remarks', label: 'Remarks' },
+                    ]}
+                    dataToExport={() => rows.map(r => ({
+                      'Nama Line': r.name,
+                      'Kode Line': r.code,
+                      'Remarks':   r.remarks,
+                    }))}
+                    onImport={handleImport}
+                    disabled={isLoading}
+                  />
+                )}
+                {/* ── /IMPORT / EXPORT ── */}
+                <Button onClick={openAdd}>
+                  <Plus className="h-4 w-4 mr-2" /> Tambah Line
+                </Button>
+              </div>
             </div>
 
             <Card>

@@ -32,6 +32,12 @@ import { ApiError } from '@/lib/api-client'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/lib/auth-context'
 
+// ─── IMPORT / EXPORT ─────────────────────────────────────────────────────────
+// Untuk menonaktifkan fitur ini, comment 2 baris berikut:
+import { ImportExportButtons } from '@/components/oee/ImportExportButtons'
+const ENABLE_IMPORT_EXPORT = true
+// ─────────────────────────────────────────────────────────────────────────────
+
 type FormState = {
   code:            string
   name:            string
@@ -150,6 +156,24 @@ export default function OutputTypePage() {
     finally { setIsDeleting(false) }
   }
 
+  // ── Import handler ───────────────────────────────────────────────────────
+  async function handleImport(csvRows: Record<string, string>[]) {
+    let created = 0
+    for (const row of csvRows) {
+      const code     = row['Kode']?.trim().toLowerCase().replace(/\s+/g, '_')
+      const name     = row['Nama']?.trim()
+      const category = row['Kategori']?.trim().toUpperCase()
+      const isGood   = (row['Good Product'] ?? '').toLowerCase() === 'ya'
+      const sort     = Number(row['Urutan'] ?? 0) || 0
+      const remarks  = row['Definisi']?.trim() || undefined
+      if (!code || !name || !category) continue
+      await createOutputType({ code, name, category, is_good_product: isGood, sort_order: sort, remarks })
+      created++
+    }
+    if (created === 0) throw new Error('Tidak ada baris valid yang dapat diimpor')
+    await load()
+  }
+
   const activeCount   = rows.filter(r => r.is_active).length
   const goodProdCount = rows.filter(r => r.is_good_product && r.is_active).length
 
@@ -166,11 +190,38 @@ export default function OutputTypePage() {
               Kelola tipe output produksi — akan digunakan sebagai field input pada form Production Output.
             </p>
           </div>
-          {canEdit && (
-            <Button onClick={openAdd} className="bg-violet-600 hover:bg-violet-700">
-              <Plus className="h-4 w-4 mr-2" />Tambah Output Type
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {/* ── IMPORT / EXPORT ── comment blok ini untuk menonaktifkan */}
+            {ENABLE_IMPORT_EXPORT && canEdit && (
+              <ImportExportButtons
+                entityName="output-type"
+                columns={[
+                  { key: 'code',            label: 'Kode' },
+                  { key: 'name',            label: 'Nama' },
+                  { key: 'category',        label: 'Kategori' },
+                  { key: 'is_good_product', label: 'Good Product' },
+                  { key: 'sort_order',      label: 'Urutan' },
+                  { key: 'remarks',         label: 'Definisi' },
+                ]}
+                dataToExport={() => rows.map(r => ({
+                  'Kode':         r.code,
+                  'Nama':         r.name,
+                  'Kategori':     r.category,
+                  'Good Product': r.is_good_product ? 'ya' : 'tidak',
+                  'Urutan':       r.sort_order,
+                  'Definisi':     r.remarks ?? '',
+                }))}
+                onImport={handleImport}
+                disabled={isLoading}
+              />
+            )}
+            {/* ── /IMPORT / EXPORT ── */}
+            {canEdit && (
+              <Button onClick={openAdd} className="bg-violet-600 hover:bg-violet-700">
+                <Plus className="h-4 w-4 mr-2" />Tambah Output Type
+              </Button>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-3 gap-4 mb-6">
@@ -430,4 +481,3 @@ export default function OutputTypePage() {
     </OeeGuard>
   )
 }
-

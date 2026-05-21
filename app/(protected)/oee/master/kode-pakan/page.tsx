@@ -15,6 +15,13 @@ import { toast } from 'sonner'
 import { Loader2, Plus, Pencil, Trash2, AlertCircle, Package } from 'lucide-react'
 import { ApiError } from '@/lib/api-client'
 
+
+// ─── IMPORT / EXPORT ─────────────────────────────────────────────────────────
+// Untuk menonaktifkan fitur ini, comment 2 baris berikut:
+import { ImportExportButtons } from '@/components/oee/ImportExportButtons'
+const ENABLE_IMPORT_EXPORT = true
+// ─────────────────────────────────────────────────────────────────────────────
+
 type FeedRow = { id: number; code: string; remarks: string }
 const EMPTY = { code: '', remarks: '' }
 
@@ -54,7 +61,6 @@ export default function MasterKodePakanPage() {
         setRows(prev => prev.map(r => r.id === editing.id ? { id: r.id, code: u.code, remarks: u.remarks ?? '' } : r))
         toast.success('Kode pakan berhasil diperbarui')
       } else {
-        // Cek duplikat lokal
         if (rows.some(r => r.code.toUpperCase() === payload.code)) { setFormError('Kode pakan sudah ada.'); setIsSaving(false); return }
         const c = await createFeedCode(payload)
         setRows(prev => [...prev, { id: c.id, code: c.code, remarks: c.remarks ?? '' }])
@@ -76,6 +82,21 @@ export default function MasterKodePakanPage() {
       toast.success('Kode pakan berhasil dihapus')
     } catch { toast.error('Gagal menghapus kode pakan') }
     finally { setIsDeleting(false); setDeleteId(null) }
+  }
+
+  // ── Import handler ───────────────────────────────────────────────────────
+  async function handleImport(csvRows: Record<string, string>[]) {
+    let created = 0
+    for (const row of csvRows) {
+      const code    = row['Kode Pakan']?.trim().toUpperCase()
+      const remarks = row['Remarks']?.trim() ?? ''
+      if (!code) continue
+      if (rows.some(r => r.code.toUpperCase() === code)) continue // skip duplikat
+      await createFeedCode({ code, remarks })
+      created++
+    }
+    if (created === 0) throw new Error('Tidak ada baris valid (atau semua kode sudah terdaftar)')
+    await load()
   }
 
   return (
@@ -101,7 +122,26 @@ export default function MasterKodePakanPage() {
             <h1 className="text-3xl font-bold tracking-tight text-emerald-900">Master Kode Pakan</h1>
             <p className="text-emerald-600 text-sm mt-1">Kelola kode pakan untuk kalkulasi OEE</p>
           </div>
-          <Button onClick={openAdd}><Plus className="h-4 w-4 mr-2" /> Tambah Kode Pakan</Button>
+          <div className="flex items-center gap-2">
+            {/* ── IMPORT / EXPORT ── comment blok ini untuk menonaktifkan */}
+            {ENABLE_IMPORT_EXPORT && (
+              <ImportExportButtons
+                entityName="kode-pakan"
+                columns={[
+                  { key: 'code',    label: 'Kode Pakan' },
+                  { key: 'remarks', label: 'Remarks' },
+                ]}
+                dataToExport={() => rows.map(r => ({
+                  'Kode Pakan': r.code,
+                  'Remarks':    r.remarks,
+                }))}
+                onImport={handleImport}
+                disabled={isLoading}
+              />
+            )}
+            {/* ── /IMPORT / EXPORT ── */}
+            <Button onClick={openAdd}><Plus className="h-4 w-4 mr-2" /> Tambah Kode Pakan</Button>
+          </div>
         </div>
 
         <Card>
